@@ -111,4 +111,27 @@ describe('Pathfinder', () => {
     // 50 full-map queries stand in for a large selection being ordered at once.
     expect(elapsed).toBeLessThan(2000)
   })
+
+  it('routes around a permanent terrain obstacle registered via setTerrainObstacles', () => {
+    const pathfinder = new Pathfinder()
+    pathfinder.setTerrainObstacles([{ x: 250, y: 150, width: 160, height: 160 }], 600, 400)
+
+    const path = pathfinder.findPath({ x: 50, y: 150 }, { x: 450, y: 150 }, [], 600, 400)
+
+    expect(path.length).toBeGreaterThan(1)
+    expect(path.at(-1)).toEqual({ x: 450, y: 150 })
+  })
+
+  it('layers building obstacles on top of terrain obstacles after a rebuild', () => {
+    const pathfinder = new Pathfinder()
+    pathfinder.setTerrainObstacles([{ x: 250, y: 350, width: 120, height: 120 }], 600, 400)
+    const buildings: Building[] = [fakeBuilding(250, 150)]
+
+    // Forces a grid rebuild that must seed from the static terrain grid.
+    pathfinder.invalidate()
+    const path = pathfinder.findPath({ x: 50, y: 150 }, { x: 450, y: 150 }, buildings, 600, 400)
+
+    expect(path.length).toBeGreaterThan(1)
+    expect(path.at(-1)).toEqual({ x: 450, y: 150 })
+  })
 })

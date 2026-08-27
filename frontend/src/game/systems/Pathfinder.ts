@@ -52,6 +52,11 @@ export class Pathfinder {
   private gridRows = 0
   private gridSignature = -1
 
+  /** Permanent map obstacles (cliffs, etc.) applied underneath the per-frame building grid. */
+  private staticGrid = new Uint8Array(0)
+  private staticGridCols = 0
+  private staticGridRows = 0
+
   private gScore = new Float32Array(0)
   private cameFrom = new Int32Array(0)
   private visitStamp = new Int32Array(0)
@@ -59,6 +64,32 @@ export class Pathfinder {
   private currentStamp = 0
 
   private readonly open = new BinaryHeap<OpenNode>((node) => node.f)
+
+  /**
+   * Registers permanent terrain obstacles (cliff clusters, etc.) that block
+   * pathing for the rest of the mission. Call once after the map's decoration
+   * layer is generated, before the first `findPath` request; building
+   * obstacles are layered on top of this static grid on every rebuild.
+   */
+  setTerrainObstacles(obstacles: ReadonlyArray<{ x: number; y: number; width: number; height: number }>, worldWidth: number, worldHeight: number): void {
+    const cols = Math.max(1, Math.ceil(worldWidth / GRID_SIZE))
+    const rows = Math.max(1, Math.ceil(worldHeight / GRID_SIZE))
+    this.staticGrid = new Uint8Array(cols * rows)
+    this.staticGridCols = cols
+    this.staticGridRows = rows
+
+    for (const obstacle of obstacles) {
+      const minCol = Math.max(0, Math.floor((obstacle.x - obstacle.width / 2) / GRID_SIZE))
+      const maxCol = Math.min(cols - 1, Math.floor((obstacle.x + obstacle.width / 2) / GRID_SIZE))
+      const minRow = Math.max(0, Math.floor((obstacle.y - obstacle.height / 2) / GRID_SIZE))
+      const maxRow = Math.min(rows - 1, Math.floor((obstacle.y + obstacle.height / 2) / GRID_SIZE))
+      for (let row = minRow; row <= maxRow; row += 1) {
+        const rowOffset = row * cols
+        for (let col = minCol; col <= maxCol; col += 1) this.staticGrid[rowOffset + col] = BLOCKED
+      }
+    }
+    this.invalidate()
+  }
 
   /**
    * Forces the cached obstacle grid to be rebuilt on the next query. Call this
@@ -276,7 +307,11 @@ export class Pathfinder {
     const signature = this.signatureOf(buildings)
     if (signature === this.gridSignature) return
     this.gridSignature = signature
-    this.grid.fill(0)
+    if (this.staticGridCols === cols && this.staticGridRows === rows && this.staticGrid.length === cols * rows) {
+      this.grid.set(this.staticGrid)
+    } else {
+      this.grid.fill(0)
+    }
 
     for (const building of buildings) {
       if (!building.alive) continue

@@ -89,9 +89,9 @@ export class Unit implements Damageable {
     const footprint = footprintFor(kind)
     this.shadow = scene.add.ellipse(x, y + (stats.isFlying ? 26 : 14), footprint + 24, footprint * 0.82, 0x020403, stats.isFlying ? 0.22 : 0.42)
     this.glow = scene.add.image(x, y, 'units', unitAtlasFrame(kind)).setDisplaySize(this.spriteWidth, this.spriteHeight).setAlpha(this.maxShield > 0 ? 0.23 : 0.16)
-    this.body = scene.add.sprite(x, y, 'units', unitAtlasFrame(kind)).setDisplaySize(this.spriteWidth, this.spriteHeight)
+    this.body = scene.add.sprite(x, y, 'units', unitAtlasFrame(kind)).setDisplaySize(this.spriteWidth, this.spriteHeight).setLighting(true)
     this.turret = hasTurret(kind)
-      ? scene.add.sprite(x, y, 'units', unitTurretAtlasFrame(kind)).setDisplaySize(this.spriteWidth, this.spriteHeight)
+      ? scene.add.sprite(x, y, 'units', unitTurretAtlasFrame(kind)).setDisplaySize(this.spriteWidth, this.spriteHeight).setLighting(true)
       : null
     this.glow.setTint(this.maxShield > 0 ? 0xb78cff : team === 'player' ? 0x5deee0 : 0xae71ff)
     this.body.setTint(team === 'player' ? TEAM_TINT.player : TEAM_TINT.enemy)
@@ -377,6 +377,10 @@ export class Unit implements Damageable {
     scene.sound.play('sfx-explosion', { volume: this.baseStats.role === 'infantry' || this.baseStats.role === 'support' ? 0.18 : 0.32 })
     const explosion = scene.add.image(this.x, this.y, 'effects', 'explosion_large').setScale(0.1).setDepth(10000)
     scene.tweens.add({ targets: explosion, scaleX: this.baseStats.role === 'infantry' || this.baseStats.role === 'support' ? 0.4 : 0.7, scaleY: this.baseStats.role === 'infantry' || this.baseStats.role === 'support' ? 0.4 : 0.7, alpha: 0, duration: 280, onComplete: () => explosion.destroy() })
+    if (scene.lights) {
+      const light = scene.lights.addLight(this.x, this.y, 150, 0xffb27a, 2)
+      scene.tweens.add({ targets: light, intensity: 0, duration: 320, onComplete: () => scene.lights.removeLight(light) })
+    }
     const wreckKey = this.baseStats.role === 'infantry' || this.baseStats.role === 'support' ? 'wreck-infantry' : 'wreck-vehicle'
     const wreckSize = wreckScaleFor(this.kind)
     const wreck = scene.add.image(this.x, this.y + 8, wreckKey).setDisplaySize(wreckSize, wreckSize).setTint(this.maxShield > 0 ? 0xb59cd8 : this.team === 'player' ? 0x9fa8ab : 0x9b72bf).setAlpha(0.78).setDepth(90 + this.y * 0.1)

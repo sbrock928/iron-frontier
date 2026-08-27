@@ -12,6 +12,7 @@ import { EnemyAI } from '../systems/EnemyAI'
 import { FogOfWarSystem } from '../systems/FogOfWarSystem'
 import { HarvestingSystem } from '../systems/HarvestingSystem'
 import { Pathfinder } from '../systems/Pathfinder'
+import { generateTerrainFeatures } from '../systems/TerrainGenerator'
 import { SupportSystem } from '../systems/SupportSystem'
 import { ProductionSystem } from '../systems/ProductionSystem'
 import { ResearchSystem } from '../systems/ResearchSystem'
@@ -73,7 +74,9 @@ export class BattleScene extends Phaser.Scene {
   preload(): void {
     this.load.setPath('/')
     this.load.atlas('units', 'assets/atlas/units.png', 'assets/atlas/units.json')
+    this.load.atlas('units-normal', 'assets/atlas/units-normal.png', 'assets/atlas/units-normal.json')
     this.load.atlas('buildings', 'assets/atlas/buildings.png', 'assets/atlas/buildings.json')
+    this.load.atlas('buildings-normal', 'assets/atlas/buildings-normal.png', 'assets/atlas/buildings-normal.json')
     this.load.atlas('terrain', 'assets/atlas/terrain.png', 'assets/atlas/terrain.json')
     this.load.atlas('effects', 'assets/atlas/effects.png', 'assets/atlas/effects.json')
     this.load.image('ore-patch', 'assets/effects/ore_patch.png')
@@ -124,6 +127,8 @@ export class BattleScene extends Phaser.Scene {
     this.cameras.main.centerOn(definition.player_spawn.x + 250, definition.player_spawn.y)
     this.input.mouse?.disableContextMenu()
 
+    this.setupLighting()
+    this.pathfinder = new Pathfinder()
     this.drawTerrain()
     this.combat = new CombatSystem(this)
     this.harvesting = new HarvestingSystem()
@@ -131,7 +136,6 @@ export class BattleScene extends Phaser.Scene {
     this.production = new ProductionSystem()
     this.research = new ResearchSystem()
     this.avoidance = new LocalAvoidanceSystem()
-    this.pathfinder = new Pathfinder()
     this.fog = new FogOfWarSystem(this, definition.world_width, definition.world_height)
     this.spawnStartingWorld()
     this.fog.update(0, this.units, this.buildings, true)
@@ -188,9 +192,47 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Enables Phaser's Light2D pipeline with a dim ambient colour matching the
+   * game's dark, overcast aesthetic, and binds each colour atlas to its
+   * paired normal-map atlas so lit units/buildings pick up per-pixel bump
+   * shading from dynamic lights (muzzle flashes, explosions). Atlases with no
+   * authored normal map (terrain, effects) fall back to Phaser's built-in
+   * flat normal, which still lets them receive flat diffuse lighting.
+   */
+  private setupLighting(): void {
+    this.lights.enable()
+    this.lights.setAmbientColor(0x4a5246)
+
+    const bindNormalMap = (colorKey: string, normalKey: string) => {
+      if (!this.textures.exists(colorKey) || !this.textures.exists(normalKey)) return
+      const normalSource = this.textures.get(normalKey).source[0]
+      if (!normalSource) return
+      this.textures.get(colorKey).setDataSource(normalSource.source)
+    }
+    bindNormalMap('units', 'units-normal')
+    bindNormalMap('buildings', 'buildings-normal')
+  }
+
   private drawTerrain(): void {
     const { world_width: width, world_height: height } = this.mission.definition
-    this.add.tileSprite(width / 2, height / 2, width, height, 'terrain', 'ground_base').setDepth(0)
+    this.add.tileSprite(width / 2, height / 2, width, height, 'terrain', 'ground_base').setLighting(true).setDepth(0)
+
+    const avoidZones = [
+      { x: this.mission.definition.player_spawn.x, y: this.mission.definition.player_spawn.y, radius: 300 },
+      { x: this.mission.definition.enemy_spawn.x, y: this.mission.definition.enemy_spawn.y, radius: 300 },
+      ...this.mission.definition.ore_fields.map((point) => ({ x: point.x, y: point.y, radius: 130 })),
+    ]
+    const features = generateTerrainFeatures(this.mission.id, width, height, avoidZones)
+    this.pathfinder.setTerrainObstacles(features.obstacles, width, height)
+    for (const decoration of features.decorations) {
+      const baseSize = decoration.frame.startsWith('ground_') ? 512 : decoration.blocking ? 512 : 256
+      this.add.image(decoration.x, decoration.y, 'terrain', decoration.frame)
+        .setDisplaySize(baseSize * decoration.scale, baseSize * decoration.scale)
+        .setAlpha(decoration.alpha)
+        .setDepth(decoration.frame.startsWith('ground_') ? 0.5 : decoration.blocking ? 4 : 3.5)
+    }
+
     const grime = this.add.graphics().setDepth(1)
     for (let index = 0; index < 36; index += 1) {
       const x = 90 + ((index * 317) % (width - 180))

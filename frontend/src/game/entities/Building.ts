@@ -49,7 +49,7 @@ export class Building implements Damageable {
     const shadowHeight = stats.size * 0.42
     this.shadow = scene.add.ellipse(x, y + stats.size * 0.26, shadowWidth, shadowHeight, 0x040505, 0.34)
     this.glow = scene.add.image(x, y, 'buildings', frame).setDisplaySize(stats.spriteSize.width, stats.spriteSize.height).setAlpha(0.20)
-    this.body = scene.add.image(x, y, 'buildings', frame).setDisplaySize(stats.spriteSize.width, stats.spriteSize.height)
+    this.body = scene.add.image(x, y, 'buildings', frame).setDisplaySize(stats.spriteSize.width, stats.spriteSize.height).setLighting(true)
     this.glow.setTint(team === 'player' ? 0x6bfff2 : 0xaa63ff)
     this.body.setTint(team === 'player' ? TEAM_TINT.player : TEAM_TINT.enemy)
     this.selection = scene.add.ellipse(x, y + stats.size * 0.22, stats.size * 1.16, stats.size * 0.54)
@@ -158,6 +158,10 @@ export class Building implements Damageable {
     scene.sound.play('sfx-explosion', { volume: this.kind === 'turret' ? 0.32 : 0.46 })
     const explosion = scene.add.image(this.x, this.y, 'effects', 'explosion_large').setScale(0.18).setDepth(10000)
     scene.tweens.add({ targets: explosion, scaleX: this.kind === 'turret' ? 0.8 : 1.1, scaleY: this.kind === 'turret' ? 0.8 : 1.1, alpha: 0, duration: 360, onComplete: () => explosion.destroy() })
+    if (scene.lights) {
+      const light = scene.lights.addLight(this.x, this.y, this.kind === 'turret' ? 170 : 240, 0xffb27a, 2.4)
+      scene.tweens.add({ targets: light, intensity: 0, duration: 420, onComplete: () => scene.lights.removeLight(light) })
+    }
     const wreck = scene.add.image(this.x, this.y + this.size * 0.14, 'wreck-building')
       .setDisplaySize(this.kind === 'turret' ? 78 : Math.max(104, this.size * 1.08), this.kind === 'turret' ? 78 : Math.max(104, this.size * 1.08))
       .setTint(this.team === 'player' ? 0xa4b4ae : 0x9b77b9)

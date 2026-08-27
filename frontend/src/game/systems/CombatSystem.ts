@@ -163,6 +163,7 @@ export class CombatSystem {
       },
       { alpha: 0, scaleX: 0.6, scaleY: 0.6, duration: 110 },
     )
+    this.flashLight(x + Math.cos(angle) * 14, y + Math.sin(angle) * 14, 90, color, 1.3, 120)
 
     const projectile = this.fx.lease('effects', 'projectile_bolt', x, y)
     projectile
@@ -190,8 +191,25 @@ export class CombatSystem {
           },
           { scaleX: 0.42, scaleY: 0.42, alpha: 0, duration: 180 },
         )
+        this.flashLight(target.x, targetY, 130, color, 1.8, 220)
         if (target.alive) target.takeDamage(damage)
       },
+    })
+  }
+
+  /**
+   * Adds a short-lived point light for muzzle flashes and impacts, fading out
+   * and removing itself automatically. Lets combat visibly light up nearby
+   * Light2D-shaded units, buildings and terrain instead of only playing a
+   * flat unlit sprite flash.
+   */
+  private flashLight(x: number, y: number, radius: number, color: number, intensity: number, duration: number): void {
+    const light = this.scene.lights.addLight(x, y, radius, color, intensity)
+    this.scene.tweens.add({
+      targets: light,
+      intensity: 0,
+      duration,
+      onComplete: () => this.scene.lights.removeLight(light),
     })
   }
 }
