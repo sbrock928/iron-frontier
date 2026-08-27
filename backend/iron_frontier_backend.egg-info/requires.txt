@@ -1,0 +1,13 @@
+fastapi<1.0,>=0.116
+uvicorn[standard]<1.0,>=0.35
+pydantic<3.0,>=2.11
+sqlalchemy<2.1,>=2.0.52
+
+[dev]
+black>=25.1
+httpx>=0.28
+isort>=6.0
+mypy>=1.17
+pylint>=3.3
+pytest>=8.4
+pytest-cov>=6.2
