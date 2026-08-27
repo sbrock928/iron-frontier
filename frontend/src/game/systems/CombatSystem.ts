@@ -154,7 +154,8 @@ export class CombatSystem {
     this.scene.sound.play('sfx-fire', { volume: damage >= 30 ? 0.24 : 0.13, rate: damage >= 30 ? 0.82 : 1.15 })
 
     this.fx.flash(
-      'fx-muzzle',
+      'effects',
+      'muzzle_flash',
       x + Math.cos(angle) * 14,
       y + Math.sin(angle) * 14,
       (image) => {
@@ -163,7 +164,7 @@ export class CombatSystem {
       { alpha: 0, scaleX: 0.6, scaleY: 0.6, duration: 110 },
     )
 
-    const projectile = this.fx.lease('fx-projectile', x, y)
+    const projectile = this.fx.lease('effects', 'projectile_bolt', x, y)
     projectile
       .setScale(isFlying(target) ? 0.42 : 0.5)
       .setTint(color)
@@ -180,7 +181,8 @@ export class CombatSystem {
       onComplete: () => {
         this.fx.release(projectile)
         this.fx.flash(
-          'fx-explosion',
+          'effects',
+          'explosion_impact',
           target.x,
           targetY,
           (image) => {

@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import type { BuildingKind, Difficulty, Faction, Mission, UnitKind, UpgradeKey } from '../../types'
 import { useGameStore } from '../../store/gameStore'
-import { ALL_BUILDING_KINDS, ALL_UNIT_KINDS, BUILDING_STATS, BUILDING_TEXTURES, DIFFICULTY_DATA, FACTION_DATA, UNIT_STATS, UPGRADE_DEFS, buildingLabel, isUnitUnlocked } from '../config'
+import { BUILDING_STATS, DIFFICULTY_DATA, FACTION_DATA, UNIT_STATS, UPGRADE_DEFS, buildingAtlasFrame, buildingLabel, isUnitUnlocked } from '../config'
 import { Building } from '../entities/Building'
 import type { Damageable } from '../entities/Damageable'
 import { ResourcePatch } from '../entities/ResourcePatch'
@@ -72,22 +72,11 @@ export class BattleScene extends Phaser.Scene {
 
   preload(): void {
     this.load.setPath('/')
-    this.load.image('terrain-ground', 'assets/terrain/ground_tile.png')
+    this.load.atlas('units', 'assets/atlas/units.png', 'assets/atlas/units.json')
+    this.load.atlas('buildings', 'assets/atlas/buildings.png', 'assets/atlas/buildings.json')
+    this.load.atlas('terrain', 'assets/atlas/terrain.png', 'assets/atlas/terrain.json')
+    this.load.atlas('effects', 'assets/atlas/effects.png', 'assets/atlas/effects.json')
     this.load.image('ore-patch', 'assets/effects/ore_patch.png')
-    this.load.image('fx-projectile', 'assets/effects/projectile.png')
-    this.load.image('fx-explosion', 'assets/effects/explosion.png')
-    this.load.image('fx-muzzle', 'assets/effects/muzzle.png')
-
-    for (const key of ALL_UNIT_KINDS) {
-      this.load.image(`unit-${key}`, `assets/units/${key}.png`)
-      this.load.spritesheet(`unit-${key}-sheet`, `assets/units/${key}_sheet.png`, { frameWidth: 256, frameHeight: 256 })
-    }
-
-    for (const key of ALL_BUILDING_KINDS) {
-      this.load.image(`building-${key}`, `assets/buildings/${key}.png`)
-      this.load.image(`building-alien-${key}`, `assets/buildings/alien_${key}.png`)
-      this.load.image(`building-veyra-${key}`, `assets/buildings/veyra_${key}.png`)
-    }
 
     this.load.image('wreck-infantry', 'assets/wrecks/infantry.png')
     this.load.image('wreck-vehicle', 'assets/wrecks/vehicle.png')
@@ -136,7 +125,6 @@ export class BattleScene extends Phaser.Scene {
     this.input.mouse?.disableContextMenu()
 
     this.drawTerrain()
-    this.setupAnimations()
     this.combat = new CombatSystem(this)
     this.harvesting = new HarvestingSystem()
     this.support = new SupportSystem(this)
@@ -202,7 +190,7 @@ export class BattleScene extends Phaser.Scene {
 
   private drawTerrain(): void {
     const { world_width: width, world_height: height } = this.mission.definition
-    this.add.tileSprite(width / 2, height / 2, width, height, 'terrain-ground').setDepth(0)
+    this.add.tileSprite(width / 2, height / 2, width, height, 'terrain', 'ground_base').setDepth(0)
     const grime = this.add.graphics().setDepth(1)
     for (let index = 0; index < 36; index += 1) {
       const x = 90 + ((index * 317) % (width - 180))
@@ -574,7 +562,7 @@ export class BattleScene extends Phaser.Scene {
     useGameStore.getState().setPlacementKind(kind)
     const world = this.cameras.main.getWorldPoint(this.scale.width / 2, this.scale.height / 2)
     this.placementGhost = this.add
-      .image(world.x, world.y, BUILDING_TEXTURES[this.playerFaction][kind])
+      .image(world.x, world.y, 'buildings', buildingAtlasFrame(kind, this.playerFaction))
       .setDisplaySize(stats.spriteSize.width, stats.spriteSize.height)
       .setTint(0x8dffc8)
       .setAlpha(0.42)
@@ -803,16 +791,6 @@ export class BattleScene extends Phaser.Scene {
     }
     for (const building of this.buildings) {
       if (building.team === 'enemy') building.setFogVisible(building.alive && this.fog.isVisible(building.x, building.y))
-    }
-  }
-
-  private setupAnimations(): void {
-    for (const kind of ALL_UNIT_KINDS) {
-      const key = `${kind}-move`
-      if (this.anims.exists(key)) continue
-      const role = UNIT_STATS[kind].role
-      const rate = role === 'air' ? 9 : role === 'infantry' || role === 'support' ? 9 : role === 'vehicle' ? 7 : 7
-      this.anims.create({ key, frames: this.anims.generateFrameNumbers(`unit-${kind}-sheet`, { start: 0, end: 3 }), frameRate: rate, repeat: -1 })
     }
   }
 

@@ -23,8 +23,9 @@ export class FxPool {
   }
 
   /** Takes an image from the pool, creating one only if none are available. */
-  lease(texture: string, x: number, y: number): Phaser.GameObjects.Image {
-    const bucket = this.free.get(texture)
+  lease(texture: string, frame: string, x: number, y: number): Phaser.GameObjects.Image {
+    const bucketKey = `${texture}::${frame}`
+    const bucket = this.free.get(bucketKey)
     const recycled = bucket?.pop()
 
     if (recycled) {
@@ -36,7 +37,7 @@ export class FxPool {
       return recycled
     }
 
-    return this.scene.add.image(x, y, texture)
+    return this.scene.add.image(x, y, texture, frame)
   }
 
   /** Returns an image to the pool, or destroys it if the pool is already full. */
@@ -44,11 +45,11 @@ export class FxPool {
     if (!image.scene) return
     this.scene.tweens.killTweensOf(image)
 
-    const texture = image.texture.key
-    let bucket = this.free.get(texture)
+    const bucketKey = `${image.texture.key}::${image.frame.name}`
+    let bucket = this.free.get(bucketKey)
     if (!bucket) {
       bucket = []
-      this.free.set(texture, bucket)
+      this.free.set(bucketKey, bucket)
     }
 
     if (bucket.length >= MAX_RETAINED_PER_TEXTURE) {
@@ -66,12 +67,13 @@ export class FxPool {
    */
   flash(
     texture: string,
+    frame: string,
     x: number,
     y: number,
     setup: (image: Phaser.GameObjects.Image) => void,
     tween: Omit<Phaser.Types.Tweens.TweenBuilderConfig, 'targets'>,
   ): Phaser.GameObjects.Image {
-    const image = this.lease(texture, x, y)
+    const image = this.lease(texture, frame, x, y)
     setup(image)
     const onComplete = tween.onComplete
     this.scene.tweens.add({

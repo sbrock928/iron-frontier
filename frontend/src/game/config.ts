@@ -249,15 +249,6 @@ export const ALL_UNIT_KINDS = Object.keys(UNIT_STATS) as UnitKind[]
 export const ALL_BUILDING_KINDS: BuildingKind[] = ['conyard', 'power', 'refinery', 'barracks', 'warfactory', 'airfield', 'techlab', 'turret', 'detector']
 export const WORKER_KINDS = new Set<UnitKind>(['harvester', 'drone', 'probe'])
 
-export const UNIT_TEXTURES: Record<UnitKind, string> = Object.fromEntries(ALL_UNIT_KINDS.map((kind) => [kind, `unit-${kind}`])) as Record<UnitKind, string>
-export const UNIT_SHEETS: Record<UnitKind, string> = Object.fromEntries(ALL_UNIT_KINDS.map((kind) => [kind, `unit-${kind}-sheet`])) as Record<UnitKind, string>
-
-export const BUILDING_TEXTURES: Record<Faction, Record<BuildingKind, string>> = {
-  aegis: Object.fromEntries(ALL_BUILDING_KINDS.map((kind) => [kind, `building-${kind}`])) as Record<BuildingKind, string>,
-  noctis: Object.fromEntries(ALL_BUILDING_KINDS.map((kind) => [kind, `building-alien-${kind}`])) as Record<BuildingKind, string>,
-  veyra: Object.fromEntries(ALL_BUILDING_KINDS.map((kind) => [kind, `building-veyra-${kind}`])) as Record<BuildingKind, string>,
-}
-
 export const UI_ICONS: Record<UnitKind | BuildingKind, string> = {
   conyard: '/assets/ui/conyard_icon.png', power: '/assets/ui/power_icon.png', refinery: '/assets/ui/refinery_icon.png', barracks: '/assets/ui/barracks_icon.png', warfactory: '/assets/ui/warfactory_icon.png', airfield: '/assets/ui/airfield_icon.png', techlab: '/assets/ui/techlab_icon.png', turret: '/assets/ui/turret_icon.png', detector: '/assets/ui/detector_icon.png',
   rifleman: '/assets/ui/rifleman_icon.png', medic: '/assets/ui/medic_icon.png', marauder: '/assets/ui/marauder_icon.png', sniper: '/assets/ui/sniper_icon.png', tank: '/assets/ui/tank_icon.png', artillery: '/assets/ui/artillery_icon.png', walker: '/assets/ui/walker_icon.png', gunship: '/assets/ui/gunship_icon.png', interceptor: '/assets/ui/interceptor_icon.png', harvester: '/assets/ui/harvester_icon.png',
@@ -267,3 +258,33 @@ export const UI_ICONS: Record<UnitKind | BuildingKind, string> = {
 
 export const PORTRAITS: Record<UnitKind, string> = Object.fromEntries(ALL_UNIT_KINDS.map((kind) => [kind, `/assets/portraits/${kind}.png`])) as Record<UnitKind, string>
 export const TEAM_TINT = { player: 0xe9f8f6, enemy: 0xffe7e7 } as const
+
+/**
+ * Ground vehicle kinds that are rendered as two layers: a hull sprite that
+ * always faces the unit's direction of travel, and a separate turret sprite
+ * that independently rotates to track the current attack target. Air units
+ * and infantry are single-layer — a turret only makes sense on a chassis the
+ * camera can see the top of.
+ */
+export const TURRET_UNIT_KINDS: ReadonlySet<UnitKind> = new Set<UnitKind>([
+  'tank', 'artillery', 'walker', 'brute', 'ravager', 'sentinel', 'colossus',
+])
+
+export function hasTurret(kind: UnitKind): boolean {
+  return TURRET_UNIT_KINDS.has(kind)
+}
+
+/** Frame name within the 'units' texture atlas for a unit's hull/body. */
+export function unitAtlasFrame(kind: UnitKind): string {
+  return kind
+}
+
+/** Frame name within the 'units' texture atlas for a unit's turret layer. */
+export function unitTurretAtlasFrame(kind: UnitKind): string {
+  return `${kind}_turret`
+}
+
+/** Frame name within the 'buildings' texture atlas for a faction's building variant. */
+export function buildingAtlasFrame(kind: BuildingKind, faction: Faction): string {
+  return faction === 'aegis' ? kind : `${faction}_${kind}`
+}
