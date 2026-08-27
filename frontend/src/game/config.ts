@@ -38,6 +38,12 @@ export type BuildingStats = {
   size: number
   vision: number
   spriteSize: { width: number; height: number }
+  /** Weapon profile. Present only on structures that can fire. */
+  weapon?: {
+    damage: number
+    range: number
+    cooldown: number
+  }
 }
 
 export type UpgradeDefinition = {
@@ -183,7 +189,7 @@ export const BUILDING_STATS: Record<BuildingKind, BuildingStats> = {
   warfactory: { label: 'Heavy Production', hp: 1080, cost: 2000, power: 45, size: 115, vision: 335, spriteSize: { width: 164, height: 164 } },
   airfield: { label: 'Air Production', hp: 950, cost: 1750, power: 40, size: 104, vision: 370, spriteSize: { width: 150, height: 150 } },
   techlab: { label: 'Advanced Research', hp: 820, cost: 1550, power: 30, size: 92, vision: 390, spriteSize: { width: 140, height: 140 } },
-  turret: { label: 'Defense Turret', hp: 540, cost: 650, power: 15, size: 58, vision: 455, spriteSize: { width: 108, height: 108 } },
+  turret: { label: 'Defense Turret', hp: 540, cost: 650, power: 15, size: 58, vision: 455, spriteSize: { width: 108, height: 108 }, weapon: { damage: 28, range: 260, cooldown: 850 } },
   detector: { label: 'Detection Array', hp: 480, cost: 850, power: 20, size: 60, vision: 700, spriteSize: { width: 105, height: 105 } },
 }
 

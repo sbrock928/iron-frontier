@@ -188,7 +188,9 @@ export class BattleScene extends Phaser.Scene {
     this.resumeAttackMoves()
     this.enemyAI.update(time, this.units, this.buildings)
     this.units = this.units.filter((item) => item.alive)
+    const buildingsBefore = this.buildings.length
     this.buildings = this.buildings.filter((item) => item.alive)
+    if (this.buildings.length !== buildingsBefore) this.pathfinder.invalidate()
     this.selectedUnits = this.selectedUnits.filter((item) => item.alive)
     if (this.selectedBuilding && !this.selectedBuilding.alive) this.selectedBuilding = null
     this.checkEndState()
@@ -788,6 +790,9 @@ export class BattleScene extends Phaser.Scene {
     const faction = team === 'player' ? this.playerFaction : this.enemyFaction
     const building = new Building(this, id, kind, team, faction, x, y)
     this.buildings.push(building)
+    // The pathfinder caches its obstacle grid, so any layout change must be
+    // announced explicitly rather than relying on change detection alone.
+    this.pathfinder.invalidate()
     if (team === 'enemy' && this.fog) building.setFogVisible(this.fog.isVisible(x, y))
     return building
   }
