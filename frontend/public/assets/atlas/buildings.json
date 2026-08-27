@@ -1,0 +1,586 @@
+{
+	"textures": [
+		{
+			"image": "buildings.png",
+			"format": "RGBA8888",
+			"size": {
+				"w": 3626,
+				"h": 3626
+			},
+			"scale": 1,
+			"frames": [
+				{
+					"filename": "airfield",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 3,
+						"y": 3,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "barracks",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 3,
+						"y": 521,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "conyard",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 3,
+						"y": 1039,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "detector",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 3,
+						"y": 1557,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "noctis_airfield",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 3,
+						"y": 2075,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "noctis_barracks",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 3,
+						"y": 2593,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "noctis_conyard",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 3,
+						"y": 3111,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "noctis_detector",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 521,
+						"y": 3,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "noctis_power",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 1039,
+						"y": 3,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "noctis_refinery",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 1557,
+						"y": 3,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "noctis_techlab",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 2075,
+						"y": 3,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "noctis_turret",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 2593,
+						"y": 3,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "noctis_warfactory",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 3111,
+						"y": 3,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "power",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 521,
+						"y": 521,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "refinery",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 521,
+						"y": 1039,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "techlab",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 521,
+						"y": 1557,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "turret",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 521,
+						"y": 2075,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "veyra_airfield",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 521,
+						"y": 2593,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "veyra_barracks",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 521,
+						"y": 3111,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "veyra_conyard",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 1039,
+						"y": 521,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "veyra_detector",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 1557,
+						"y": 521,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "veyra_power",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 2075,
+						"y": 521,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "veyra_refinery",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 2593,
+						"y": 521,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "veyra_techlab",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 3111,
+						"y": 521,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "veyra_turret",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 1039,
+						"y": 1039,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "veyra_warfactory",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 1039,
+						"y": 1557,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "warfactory",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 1039,
+						"y": 2075,
+						"w": 512,
+						"h": 512
+					}
+				}
+			]
+		}
+	],
+	"meta": {
+		"app": "http://github.com/odrick/free-tex-packer-core",
+		"version": "0.3.9"
+	}
+}

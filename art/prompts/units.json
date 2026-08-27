@@ -1,0 +1,196 @@
+{
+  "$comment": "Prompt manifest for unit sprites. `subject` is appended to the shared style preamble in scripts/art/shared.ts. `turret: true` generates a second, independently-rotating weapon layer. Seeds are pinned so regeneration is reproducible.",
+  "units": {
+    "rifleman": {
+      "faction": "aegis",
+      "role": "infantry",
+      "seed": 100101,
+      "turret": false,
+      "subject": "a single human marine soldier in bulky powered combat armour, viewed from directly above and slightly behind, shouldering a heavy bullpup gauss rifle that points to the right. Olive-drab ceramic plating over gunmetal servo joints, a domed helmet with a cyan visor slit, a backpack power cell with venting fins, ammunition pouches and a stencilled white unit number on the left shoulder plate. Scuffed paint and dust on the boots."
+    },
+    "medic": {
+      "faction": "aegis",
+      "role": "support",
+      "seed": 100102,
+      "turret": false,
+      "subject": "a single human field medic in light powered armour, viewed from directly above, carrying a shoulder-mounted nanite dispenser arm curving over the right shoulder instead of a rifle. Off-white and olive plating with a luminous cyan medical cross on the back plate, a transparent visor, hip-mounted trauma canisters and coiled transfusion tubing. Clean but field-worn."
+    },
+    "marauder": {
+      "faction": "aegis",
+      "role": "infantry",
+      "seed": 100103,
+      "turret": false,
+      "subject": "a single heavily armoured human shock trooper in thick exoskeletal siege armour, viewed from directly above, broader than a standard marine, with twin stubby concussion grenade launchers mounted on both forearms aimed to the right. Slab-sided gunmetal plating with yellow-black hazard striping on the shoulder pauldrons, exposed hydraulic pistons at the hips and knees, a heavy reinforced neck collar."
+    },
+    "sniper": {
+      "faction": "aegis",
+      "role": "infantry",
+      "seed": 100104,
+      "turret": false,
+      "subject": "a single lean human sniper in a slim stealth-weave bodysuit with minimal plating, viewed from directly above, holding a very long anti-materiel rail rifle with a bipod and elongated barrel extending to the right. Matte charcoal and dark grey with a ghillie-style fabric drape over the shoulders, a narrow single-eye optical visor glowing faint cyan, a compact rebreather pack."
+    },
+    "tank": {
+      "faction": "aegis",
+      "role": "vehicle",
+      "seed": 100105,
+      "turret": true,
+      "subject": "the hull only of a heavy tracked main battle tank, turret removed, viewed from directly above. Wide segmented caterpillar tracks with visible road wheels and drive sprockets, a sloped welded armour deck with regular panel lines, bolt rows, stowage boxes, spare track links, tow cables and a flat empty circular turret ring at the exact centre. Olive-drab and gunmetal with mud spatter on the track guards.",
+      "turretSubject": "the turret only of a heavy main battle tank, isolated on transparent background, viewed from directly above, with a single long smoothbore cannon barrel with a muzzle brake pointing to the right. Sloped faceted armour, a commander's cupola, a coaxial machine gun, smoke grenade launchers on the cheeks and stencilled markings. The turret ring pivot is at the exact centre of the image. Olive-drab and gunmetal, heat-scorched barrel."
+    },
+    "artillery": {
+      "faction": "aegis",
+      "role": "vehicle",
+      "seed": 100106,
+      "turret": true,
+      "subject": "the hull only of a tracked self-propelled siege artillery vehicle, gun assembly removed, viewed from directly above. Long wide tracks, a boxy armoured chassis with deployable stabiliser spades folded at the rear corners, ammunition hatches, cable runs and an empty circular mount ring at the exact centre. Olive-drab and gunmetal, heavily weathered.",
+      "turretSubject": "the gun assembly only of a self-propelled siege howitzer, isolated on transparent background, viewed from directly above, with an extremely long large-calibre barrel and a bulbous multi-baffle muzzle brake pointing to the right. Boxy armoured gun house, recoil cylinders flanking the barrel, an autoloader hump at the rear. The mount pivot is at the exact centre. Scorched barrel, olive-drab plating."
+    },
+    "walker": {
+      "faction": "aegis",
+      "role": "vehicle",
+      "seed": 100107,
+      "turret": true,
+      "subject": "the lower body only of a bipedal armoured combat walker, torso removed, viewed from directly above. Two heavy reverse-jointed digitigrade mechanical legs with splayed clawed foot pads, exposed hydraulic pistons, armoured shin plates and cable bundles, joined by a wide hip yoke with an empty circular torso mount at the exact centre. Olive-drab and gunmetal, dust on the feet.",
+      "turretSubject": "the torso only of a bipedal armoured combat walker, isolated on transparent background, viewed from directly above, with twin autocannon barrels on the right side and a boxed missile pod on the left, all oriented to the right. Blocky armoured chest with a sensor cluster, ammunition feed chutes, hazard striping and a stencilled number. The waist pivot is at the exact centre."
+    },
+    "gunship": {
+      "faction": "aegis",
+      "role": "air",
+      "seed": 100108,
+      "turret": false,
+      "subject": "a heavily armed military attack helicopter gunship viewed from directly above, nose pointing right. Twin coaxial rotor discs rendered as faint motion-blurred translucent circles, a narrow armoured fuselage with stub wings carrying rocket pods and missile rails, a chin-mounted rotary cannon, armoured cockpit glass tinted cyan, exhaust louvres and antenna masts. Olive-drab and gunmetal with exhaust staining."
+    },
+    "interceptor": {
+      "faction": "aegis",
+      "role": "air",
+      "seed": 100109,
+      "turret": false,
+      "subject": "a sleek single-seat atmospheric fighter jet viewed from directly above, nose pointing right. Swept delta wings with canted twin tailfins, two large glowing cyan afterburner nozzles at the rear, a bubble canopy, conformal missile hardpoints and airbrake panels. Light grey and gunmetal with sharp low-visibility panel lines and scorched exhaust nacelles."
+    },
+    "harvester": {
+      "faction": "aegis",
+      "role": "worker",
+      "seed": 100110,
+      "turret": false,
+      "subject": "a large six-wheeled industrial mining and ore hauler vehicle viewed from directly above, front pointing right. A wide toothed rotary cutting drum across the front, a bulky ore hopper occupying the rear two thirds with visible ribbing and a conveyor spine, a small armoured cab with amber warning strobes, heavy suspension arms and chunky treaded tyres. Industrial yellow and gunmetal, coated in ore dust and scratches."
+    },
+
+    "skitter": {
+      "faction": "noctis",
+      "role": "infantry",
+      "seed": 100201,
+      "turret": false,
+      "subject": "a small fast six-legged bio-mechanical attack creature viewed from directly above, head pointing right. A low chitinous carapace of overlapping bruised purple-black plates, spindly clawed insectile legs splayed outward, a wedge-shaped head with paired serrated mandibles and clustered dark eyes, a short whip tail. Translucent violet bioluminescence glowing between the shell segments, wet organic sheen."
+    },
+    "spitter": {
+      "faction": "noctis",
+      "role": "infantry",
+      "seed": 100202,
+      "turret": false,
+      "subject": "a hunched quadrupedal bio-mechanical artillery creature viewed from directly above, head pointing right. A swollen bulbous acid sac dominating the back, ridged with pulsing violet veins, a forward-thrust head ending in a fleshy tubular spraying orifice, four thick clawed limbs braced wide, dripping caustic mucus. Bruised purple-black chitin with exposed red-violet musculature at the joints."
+    },
+    "broodcaster": {
+      "faction": "noctis",
+      "role": "support",
+      "seed": 100203,
+      "turret": false,
+      "subject": "a tall spindly bio-mechanical psionic creature viewed from directly above, facing right. An elongated ribbed thorax raised on four thin clawed legs, a crown of curved bone antennae and hollow resonating spines radiating from the skull, trailing filament tendrils, a glowing violet psionic sac suspended within an open ribcage. Bruised purple-black chitin, translucent membranes, wet sheen."
+    },
+    "brute": {
+      "faction": "noctis",
+      "role": "vehicle",
+      "seed": 100204,
+      "turret": true,
+      "subject": "the lower body only of a massive quadrupedal bio-mechanical siege beast, head and upper thorax removed, viewed from directly above. Four immense clawed pillar legs with thick chitin greaves, a broad heavily armoured segmented back with bone ridges and spiracle vents, exposed violet-glowing muscle between the plates and an empty organic socket at the exact centre. Bruised purple-black, wet sheen.",
+      "turretSubject": "the head and upper thorax only of a massive bio-mechanical siege beast, isolated on transparent background, viewed from directly above, with an enormous armoured skull, splayed serrated mandibles and twin forward-curving bone tusks all oriented to the right. Thick chitin plating, glowing violet gullet, dripping saliva. The neck pivot is at the exact centre."
+    },
+    "ravager": {
+      "faction": "noctis",
+      "role": "vehicle",
+      "seed": 100205,
+      "turret": true,
+      "subject": "the lower body only of a huge armoured bio-mechanical assault strain, weapon thorax removed, viewed from directly above. Six heavy clawed limbs gripping the ground, a thick segmented abdomen armoured in layered dark chitin scutes, bone spurs along the flanks, pulsing violet veins in the seams and an empty organic socket at the exact centre. Wet organic sheen.",
+      "turretSubject": "the weapon thorax only of a huge bio-mechanical assault strain, isolated on transparent background, viewed from directly above, with a cluster of three fleshy tubular bio-cannon barrels ringed with bone spines pointing to the right. Ribbed muscular housing, glowing violet charging sacs, caustic residue at the muzzles. The pivot is at the exact centre."
+    },
+    "wraith": {
+      "faction": "noctis",
+      "role": "air",
+      "seed": 100206,
+      "turret": false,
+      "subject": "a fast winged bio-mechanical flying creature viewed from directly above, head pointing right. Two long membranous bat-like wings swept back and semi-translucent with visible violet-glowing veins, a narrow ridged body ending in a barbed whip tail, a lean predatory skull with backswept horns and clawed grasping talons tucked beneath. Bruised purple-black chitin, wet sheen."
+    },
+    "devourer": {
+      "faction": "noctis",
+      "role": "air",
+      "seed": 100207,
+      "turret": false,
+      "subject": "a massive heavy winged bio-mechanical flying horror viewed from directly above, head pointing right. Four thick armoured wings in staggered pairs, a bloated segmented body armoured in overlapping dark chitin scutes with glowing violet spiracles along the spine, multiple trailing barbed tentacles, an armoured head with a circular ringed maw of concentric teeth. Wet organic sheen, dripping ichor."
+    },
+    "drone": {
+      "faction": "noctis",
+      "role": "worker",
+      "seed": 100208,
+      "turret": false,
+      "subject": "a bulbous bio-mechanical resource extractor creature viewed from directly above, head pointing right. A swollen translucent violet resource sac forming the rear two thirds with visible sloshing fluid inside, a forward boring proboscis of rotating bone rasps, four short clawed digging limbs and small folded vestigial wings. Bruised purple-black chitin, mineral crust and ore dust on the proboscis."
+    },
+
+    "lancer": {
+      "faction": "veyra",
+      "role": "infantry",
+      "seed": 100301,
+      "turret": false,
+      "subject": "a slender humanoid warrior in elegant crystalline power armour viewed from directly above, facing right, holding a long slim energy lance angled to the right. Polished white-gold ceramic plating with seamless curved surfaces, pale amethyst crystal inlays along the spine and forearms, hairline glowing energy channels tracing the panel seams, a smooth faceless helm with a single amethyst optic band, and a faint translucent shield aura hugging the shoulders."
+    },
+    "adept": {
+      "faction": "veyra",
+      "role": "infantry",
+      "seed": 100302,
+      "turret": false,
+      "subject": "a robed humanoid caster in heavy crystalline armour viewed from directly above, facing right, with a floating amethyst crystal focus orb suspended in the air just off the right hand, unsupported. Layered white-gold ceramic pauldrons over a flowing under-robe, a high ornate collar, amethyst crystal shards embedded in the back plate, glowing hairline energy channels, and a smooth faceless helm."
+    },
+    "seer": {
+      "faction": "veyra",
+      "role": "support",
+      "seed": 100303,
+      "turret": false,
+      "subject": "a tall slender humanoid seer in flowing crystalline vestments viewed from directly above, facing right, surrounded by three small amethyst crystal shards orbiting unsupported at shoulder height. Ornate white-gold ceramic plating with an elaborate radiating halo crown, trailing layered robes, dense glowing amethyst energy channels, and a smooth featureless faceplate with a vertical light seam."
+    },
+    "sentinel": {
+      "faction": "veyra",
+      "role": "vehicle",
+      "seed": 100304,
+      "turret": true,
+      "subject": "the lower body only of an elegant bipedal crystalline war machine, upper body removed, viewed from directly above. Two graceful reverse-jointed legs of polished white-gold ceramic with amethyst crystal knee inlays and glowing seam channels, joined by a curved hip ring, with the upper torso mount left empty at the exact centre. Seamless surfaces, no visible bolts or panels.",
+      "turretSubject": "the upper torso only of an elegant bipedal crystalline war machine, isolated on transparent background, viewed from directly above, with twin slim particle lance emitters extending to the right. Curved white-gold ceramic chest with a large glowing amethyst core crystal at the centre, floating unsupported shoulder pauldrons hovering a small gap from the body, hairline energy channels. The waist pivot is at the exact centre."
+    },
+    "colossus": {
+      "faction": "veyra",
+      "role": "vehicle",
+      "seed": 100305,
+      "turret": true,
+      "subject": "the lower body only of a towering crystalline siege titan, upper body removed, viewed from directly above. Four long slender articulated legs of polished white-gold ceramic splayed wide with clawed footpads, amethyst crystal joint inlays, glowing seam channels, and a wide circular platform with an empty mount at the exact centre. Seamless, elegant, monumental.",
+      "turretSubject": "the upper body only of a towering crystalline siege titan, isolated on transparent background, viewed from directly above, with twin heavy prismatic beam projectors made of large faceted amethyst crystals in white-gold housings, aimed to the right. A massive glowing amethyst power core at the centre, floating unsupported armour vanes hovering around the shoulders. The pivot is at the exact centre."
+    },
+    "seraph": {
+      "faction": "veyra",
+      "role": "air",
+      "seed": 100306,
+      "turret": false,
+      "subject": "a sleek crystalline atmospheric fighter craft viewed from directly above, nose pointing right. Smooth curved white-gold ceramic hull with elegant swept wings, a large faceted amethyst crystal core glowing through the dorsal spine, floating unsupported wingtip vanes hovering a visible gap from the wings, glowing amethyst energy channels and no visible engines or exhaust. Seamless, no panel lines, no bolts."
+    },
+    "arbiter": {
+      "faction": "veyra",
+      "role": "air",
+      "seed": 100307,
+      "turret": false,
+      "subject": "a large ceremonial crystalline command sphere viewed from directly above. A polished white-gold spherical core encircled by three concentric floating unsupported ceramic rings at differing angles, each ring inlaid with amethyst crystals and glowing energy channels, with a bright amethyst singularity visible at the centre of the sphere. Perfectly symmetrical, seamless, serene, no visible propulsion."
+    },
+    "probe": {
+      "faction": "veyra",
+      "role": "worker",
+      "seed": 100308,
+      "turret": false,
+      "subject": "a small elegant crystalline hovering utility drone viewed from directly above, facing right. A rounded white-gold ceramic body with three floating unsupported articulated manipulator vanes arranged radially around it, a faceted amethyst crystal core glowing at the centre, a downward-facing extraction beam emitter, and hairline glowing energy channels. Seamless, no landing gear, no visible thrusters."
+    }
+  }
+}

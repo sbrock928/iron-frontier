@@ -27,7 +27,28 @@ An original three-faction science-fiction real-time strategy game built as a pro
 - backend-loaded mission definition
 - backend save slots
 
-All artwork in this starter is generated from Phaser primitives; there are no copyrighted C&C assets.
+All artwork ships as generated PNGs loaded by Phaser (see **Art pipeline** below for how they're produced); there are no copyrighted C&C assets.
+
+## Art pipeline
+
+Unit, building, terrain and effect art is produced by a standalone Node pipeline in `scripts/art/`, kept separate from the frontend since it depends on Node-only tooling (`sharp`, an image-generation client) that must never ship to the browser. The style bible in [art/style.md](art/style.md) is the source of truth for the visual target: grounded, weathered, pre-rendered-3D military sci-fi realism (think 90s RTS sprites), not the flat/cartoony look.
+
+```
+art/prompts/*.json   ──▶ npm run art:gen     ──▶ art/src/**       (raw generations, committed)
+art/src/**           ──▶ npm run art:process ──▶ art/build/**     (trimmed, resized, normal maps)
+art/build/**         ──▶ npm run art:pack    ──▶ frontend/public/assets/atlas/*  (Phaser atlases)
+```
+
+```bash
+cd scripts/art
+npm install
+export OPENAI_API_KEY=sk-...   # required only for art:gen
+npm run art:gen                # generate any missing assets (idempotent, skips existing files)
+npm run art:process            # deterministic post-process: trim/centre/resize + normal maps
+npm run art:pack                # pack into frontend/public/assets/atlas/*
+```
+
+Every stage is idempotent and safe to re-run. Generation is the only network-dependent, costed step; processing and packing are pure and reproducible from whatever is committed in `art/src/`. Swapping the generator for hand-authored or Blender-rendered art later only means dropping files into `art/src/**` — no game code changes required.
 
 ## Quick start
 
