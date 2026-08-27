@@ -47,6 +47,19 @@ export type UnitKind =
 export type BuildingKind = 'conyard' | 'power' | 'refinery' | 'barracks' | 'warfactory' | 'turret'
 export type GameStatus = 'loading' | 'playing' | 'victory' | 'defeat' | 'error'
 
+export type UpgradeKey =
+  | 'aegis_composite_plating'
+  | 'aegis_targeting_ai'
+  | 'aegis_reactor_optimization'
+  | 'aegis_siege_doctrine'
+  | 'aegis_aerospace_command'
+  | 'noctis_carapace_grafting'
+  | 'noctis_synaptic_acceleration'
+  | 'noctis_metabolic_bloom'
+  | 'noctis_acid_evolution'
+  | 'noctis_alpha_mauler'
+  | 'noctis_phase_brood'
+
 export type SelectedEntity = {
   id: string
   label: string
@@ -54,4 +67,20 @@ export type SelectedEntity = {
   hp: number
   maxHp: number
   team: Team
+}
+
+export type ProductionQueueView = {
+  buildingId: string
+  buildingLabel: string
+  activeKind: UnitKind | null
+  activeLabel: string
+  progress: number
+  queuedKinds: UnitKind[]
+}
+
+export type ResearchQueueView = {
+  buildingId: string
+  upgradeKey: UpgradeKey
+  label: string
+  progress: number
 }

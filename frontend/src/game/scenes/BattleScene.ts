@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
-import type { BuildingKind, Faction, Mission, UnitKind } from '../../types'
+import type { BuildingKind, Faction, Mission, UnitKind, UpgradeKey } from '../../types'
 import { useGameStore } from '../../store/gameStore'
-import { BUILDING_STATS, BUILDING_TEXTURES, FACTION_DATA, UNIT_STATS, buildingLabel, opposingFaction } from '../config'
+import { BUILDING_STATS, BUILDING_TEXTURES, FACTION_DATA, UNIT_STATS, UPGRADE_DEFS, buildingLabel, isUnitUnlocked, opposingFaction } from '../config'
 import { Building } from '../entities/Building'
 import type { Damageable } from '../entities/Damageable'
 import { ResourcePatch } from '../entities/ResourcePatch'
@@ -13,6 +13,9 @@ import { FogOfWarSystem } from '../systems/FogOfWarSystem'
 import { HarvestingSystem } from '../systems/HarvestingSystem'
 import { Pathfinder } from '../systems/Pathfinder'
 import { SupportSystem } from '../systems/SupportSystem'
+import { ProductionSystem } from '../systems/ProductionSystem'
+import { ResearchSystem } from '../systems/ResearchSystem'
+import { LocalAvoidanceSystem } from '../systems/LocalAvoidanceSystem'
 
 export class BattleScene extends Phaser.Scene {
   private readonly mission: Mission
@@ -26,12 +29,22 @@ export class BattleScene extends Phaser.Scene {
   private combat!: CombatSystem
   private harvesting!: HarvestingSystem
   private support!: SupportSystem
+  private production!: ProductionSystem
+  private research!: ResearchSystem
+  private avoidance!: LocalAvoidanceSystem
   private pathfinder!: Pathfinder
   private enemyAI!: EnemyAI
   private fog!: FogOfWarSystem
   private unitCounter = 0
   private buildingCounter = 0
   private credits = 0
+  private enemyCredits = 3600
+  private enemyBuildAttempt = 0
+  private readonly completedUpgrades = new Set<UpgradeKey>()
+  private readonly enemyCompletedUpgrades = new Set<UpgradeKey>()
+  private attackMoveArmed = false
+  private readonly controlGroups = new Map<number, string[]>()
+  private readonly lastGroupRecallAt = new Map<number, number>()
   private dragStart: Phaser.Math.Vector2 | null = null
   private selectionBox: Phaser.GameObjects.Rectangle | null = null
   private placementKind: BuildingKind | null = null
@@ -114,9 +127,19 @@ export class BattleScene extends Phaser.Scene {
     this.edgePanX = 0
     this.edgePanY = 0
     this.audioStarted = false
+    this.completedUpgrades.clear()
+    this.enemyCompletedUpgrades.clear()
+    this.controlGroups.clear()
+    this.attackMoveArmed = false
+    this.enemyCredits = 3600
+    this.enemyBuildAttempt = 0
     this.ambientSound?.stop()
     this.ambientSound = null
     useGameStore.getState().setPlacementKind(null)
+    useGameStore.getState().setCompletedUpgrades([])
+    useGameStore.getState().setProductionQueues([])
+    useGameStore.getState().setResearchQueues([])
+    useGameStore.getState().setAttackMoveArmed(false)
     this.credits = definition.starting_credits
     this.cameras.main.setBounds(0, 0, definition.world_width, definition.world_height)
     this.cameras.main.centerOn(definition.player_spawn.x + 250, definition.player_spawn.y)
@@ -127,6 +150,9 @@ export class BattleScene extends Phaser.Scene {
     this.combat = new CombatSystem(this)
     this.harvesting = new HarvestingSystem()
     this.support = new SupportSystem(this)
+    this.production = new ProductionSystem()
+    this.research = new ResearchSystem()
+    this.avoidance = new LocalAvoidanceSystem()
     this.pathfinder = new Pathfinder()
     this.fog = new FogOfWarSystem(this, definition.world_width, definition.world_height)
     this.spawnStartingWorld()
@@ -136,7 +162,8 @@ export class BattleScene extends Phaser.Scene {
       this,
       definition.enemy.attack_interval_seconds,
       this.enemyFaction,
-      (kind, x, y) => this.spawnUnit(kind, 'enemy', x, y),
+      (kind) => this.queueEnemyUnit(kind),
+      (kind) => this.tryEnemyBuild(kind),
     )
     this.configureInput()
     this.configureKeyboard()
@@ -150,7 +177,13 @@ export class BattleScene extends Phaser.Scene {
     if (useGameStore.getState().status !== 'playing') return
     this.panCamera(delta)
     for (const unit of this.units) unit.updateMovement(delta)
-    this.harvesting.update(delta, this.units, this.buildings, this.patches, (amount) => { this.credits += amount })
+    this.avoidance.update(this.units)
+    this.harvesting.update(delta, this.units, this.buildings, this.patches, (team, amount) => {
+      if (team === 'player') this.credits += amount
+      else this.enemyCredits += amount
+    }, (team) => this.harvestMultiplier(team))
+    this.production.update(delta, (team) => this.productionSpeedMultiplier(team), (completion) => this.completeProduction(completion.building, completion.kind, completion.team))
+    this.research.update(delta, (team) => this.productionSpeedMultiplier(team), (upgrade, team) => this.completeResearch(upgrade, team))
     this.support.update(time, this.units)
     this.fog.update(time, this.units, this.buildings)
     this.updateEnemyFogVisibility()
@@ -161,6 +194,7 @@ export class BattleScene extends Phaser.Scene {
       this.buildings,
       (team, target) => team !== 'player' || this.fog.isVisible(target.x, target.y),
     )
+    this.resumeAttackMoves()
     this.enemyAI.update(time, this.units, this.buildings)
     this.units = this.units.filter((item) => item.alive)
     this.buildings = this.buildings.filter((item) => item.alive)
@@ -215,21 +249,20 @@ export class BattleScene extends Phaser.Scene {
       this.spawnUnit(kind, 'player', player.x + offset.x, player.y + offset.y)
     })
 
-    if (this.mission.id !== 'mission_01') {
-      const bonus: UnitKind = this.playerFaction === 'aegis' ? 'gunship' : 'wraith'
-      this.spawnUnit(bonus, 'player', player.x + 235, player.y + 170)
-    }
 
     this.spawnBuilding('conyard', 'enemy', enemy.x, enemy.y)
     this.spawnBuilding('power', 'enemy', enemy.x + 160, enemy.y - 140)
+    this.spawnBuilding('refinery', 'enemy', enemy.x + 20, enemy.y - 175)
     this.spawnBuilding('warfactory', 'enemy', enemy.x - 165, enemy.y + 145)
     this.spawnBuilding('barracks', 'enemy', enemy.x + 150, enemy.y + 145)
     this.spawnBuilding('turret', 'enemy', enemy.x - 200, enemy.y - 120)
     if (this.mission.id !== 'mission_01') this.spawnBuilding('turret', 'enemy', enemy.x + 210, enemy.y - 110)
 
+    this.spawnUnit(FACTION_DATA[this.enemyFaction].worker, 'enemy', enemy.x - 40, enemy.y - 210)
+
     const enemyPattern: UnitKind[] = this.enemyFaction === 'aegis'
-      ? ['rifleman', 'marauder', 'tank', 'gunship']
-      : ['skitter', 'spitter', 'brute', 'wraith']
+      ? ['rifleman', 'marauder', 'tank']
+      : ['skitter', 'spitter']
     for (let index = 0; index < this.mission.definition.enemy.starting_units; index += 1) {
       const kind = enemyPattern[index % enemyPattern.length] ?? enemyPattern[0] ?? 'rifleman'
       this.spawnUnit(kind, 'enemy', enemy.x - 260, enemy.y - 80 + index * 44)
@@ -314,19 +347,42 @@ export class BattleScene extends Phaser.Scene {
       S: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
       D: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
       ESC: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC),
+      SHIFT: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT),
     }
-    this.keys.ESC?.on('down', () => this.cancelPlacement())
+    this.keys.ESC?.on('down', () => {
+      this.cancelPlacement()
+      this.attackMoveArmed = false
+      useGameStore.getState().setAttackMoveArmed(false)
+    })
+    this.input.keyboard.on('keydown', (event: KeyboardEvent) => {
+      if (event.shiftKey && event.code === 'KeyA') {
+        event.preventDefault()
+        this.armAttackMove()
+        return
+      }
+      if (!/^Digit[1-9]$/.test(event.code)) return
+      const group = Number(event.code.replace('Digit', ''))
+      if (event.ctrlKey || event.metaKey) {
+        event.preventDefault()
+        this.assignControlGroup(group)
+      } else {
+        this.recallControlGroup(group)
+      }
+    })
   }
 
   private configureBridge(): void {
     this.unsubscribers.push(gameBus.on('build-structure', (kind) => this.beginPlacement(kind)))
     this.unsubscribers.push(gameBus.on('produce-unit', (kind) => this.queueUnit(kind)))
+    this.unsubscribers.push(gameBus.on('research-upgrade', (upgrade) => this.queueResearch(upgrade)))
+    this.unsubscribers.push(gameBus.on('cancel-production', (buildingId) => this.cancelProduction(buildingId)))
     this.unsubscribers.push(gameBus.on('restart-game', () => this.scene.restart()))
     this.unsubscribers.push(gameBus.on('placement-pointer-move', (point) => this.movePlacementFromScreen(point.u, point.v)))
     this.unsubscribers.push(gameBus.on('placement-pointer-down', (point) => this.placeFromScreen(point.u, point.v)))
     this.unsubscribers.push(gameBus.on('cancel-placement', () => this.cancelPlacement()))
     this.unsubscribers.push(gameBus.on('stop-selected', () => this.stopSelected()))
     this.unsubscribers.push(gameBus.on('center-selected', () => this.centerSelected()))
+    this.unsubscribers.push(gameBus.on('arm-attack-move', () => this.armAttackMove()))
     this.unsubscribers.push(gameBus.on('activate-ability', (ability) => this.activateAbility(ability)))
 
     const dispose = () => this.disposeBridge()
@@ -369,7 +425,7 @@ export class BattleScene extends Phaser.Scene {
     let x = 0
     let y = 0
 
-    if (this.cursors?.left.isDown || this.keys.A?.isDown) x -= 1
+    if (this.cursors?.left.isDown || (this.keys.A?.isDown && !this.keys.SHIFT?.isDown)) x -= 1
     if (this.cursors?.right.isDown || this.keys.D?.isDown) x += 1
     if (this.cursors?.up.isDown || this.keys.W?.isDown) y -= 1
     if (this.cursors?.down.isDown || this.keys.S?.isDown) y += 1
@@ -457,12 +513,20 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private issueCommand(x: number, y: number): void {
+    if (this.selectedBuilding && (this.selectedBuilding.kind === 'barracks' || this.selectedBuilding.kind === 'warfactory')) {
+      this.selectedBuilding.setRallyPoint(x, y)
+      useGameStore.getState().setStatus('playing', `${buildingLabel(this.selectedBuilding.kind, this.playerFaction)} rally point set.`)
+      return
+    }
     if (this.selectedUnits.length === 0) return
     const enemy = this.findEnemyAt(x, y)
     if (enemy) {
       this.selectedUnits.forEach((unit) => unit.setAttackTarget(enemy))
+      this.attackMoveArmed = false
+      useGameStore.getState().setAttackMoveArmed(false)
       return
     }
+    const attackMove = this.attackMoveArmed
     const columns = Math.ceil(Math.sqrt(this.selectedUnits.length))
     this.selectedUnits.forEach((unit, index) => {
       const row = Math.floor(index / columns)
@@ -471,8 +535,15 @@ export class BattleScene extends Phaser.Scene {
       const offsetY = row * 44
       const goal = { x: x + offsetX, y: y + offsetY }
       const path = this.pathfinder.findPath(unit, goal, this.buildings, this.mission.definition.world_width, this.mission.definition.world_height)
-      unit.setPath(path.map((point) => new Phaser.Math.Vector2(point.x, point.y)))
+      const vectors = path.map((point) => new Phaser.Math.Vector2(point.x, point.y))
+      if (attackMove) unit.setAttackMovePath(vectors, new Phaser.Math.Vector2(goal.x, goal.y))
+      else unit.setPath(vectors)
     })
+    if (attackMove) {
+      this.attackMoveArmed = false
+      useGameStore.getState().setAttackMoveArmed(false)
+      useGameStore.getState().setStatus('playing', 'Attack-move order issued.')
+    }
   }
 
   private findEnemyAt(x: number, y: number): Damageable | undefined {
@@ -585,20 +656,18 @@ export class BattleScene extends Phaser.Scene {
       useGameStore.getState().setStatus('playing', `${stats.label} does not belong to ${FACTION_DATA[this.playerFaction].name}.`)
       return
     }
+    if (!isUnitUnlocked(kind, this.completedUpgrades)) {
+      useGameStore.getState().setStatus('playing', `${stats.label} is locked behind your faction tech tree.`)
+      return
+    }
     const factoryKind: BuildingKind = stats.requiredFactory
-    const factory = this.buildings.find((building) => building.alive && building.team === 'player' && building.kind === factoryKind)
-    if (!factory) {
+    const factories = this.buildings.filter((building) => building.alive && building.team === 'player' && building.kind === factoryKind)
+    if (factories.length === 0) {
       useGameStore.getState().setStatus('playing', `${buildingLabel(factoryKind, this.playerFaction)} required.`)
       return
     }
-    if (kind === 'artillery' && !this.buildings.some((building) => building.alive && building.team === 'player' && building.kind === 'refinery')) {
-      useGameStore.getState().setStatus('playing', 'Siege Artillery tech requires a Refinery.')
-      return
-    }
-    if (kind === 'gunship' && !this.buildings.some((building) => building.alive && building.team === 'player' && building.kind === 'warfactory')) {
-      useGameStore.getState().setStatus('playing', 'Gunship tech requires a War Factory.')
-      return
-    }
+    const factory = [...factories].sort((a, b) => this.production.queueLength(a.id) - this.production.queueLength(b.id))[0]
+    if (!factory) return
     if (this.credits < stats.cost) {
       useGameStore.getState().setStatus('playing', `Need $${stats.cost.toLocaleString()} for ${stats.label}.`)
       return
@@ -609,20 +678,111 @@ export class BattleScene extends Phaser.Scene {
       return
     }
     this.credits -= stats.cost
+    this.production.enqueue(factory, this.playerFaction, kind)
     this.sound.play('sfx-confirm', { volume: 0.16 })
-    useGameStore.getState().setStatus('playing', `${stats.label} queued (${(stats.buildMs / 1000).toFixed(1)}s).`)
-    this.time.delayedCall(stats.buildMs, () => {
-      if (!factory.alive) return
-      this.spawnUnit(kind, 'player', factory.x + factory.size * 0.65, factory.y + factory.size * 0.65)
-      useGameStore.getState().setStatus('playing', `${stats.label} ready.`)
-    })
+    useGameStore.getState().setStatus('playing', `${stats.label} added to ${buildingLabel(factory.kind, this.playerFaction)} queue.`)
     this.syncStore(true)
+  }
+
+  private cancelProduction(buildingId: string): void {
+    const kind = this.production.cancelFirst(buildingId)
+    if (!kind) return
+    const refund = Math.round(UNIT_STATS[kind].cost * 0.75)
+    this.credits += refund
+    useGameStore.getState().setStatus('playing', `${UNIT_STATS[kind].label} cancelled. $${refund.toLocaleString()} refunded.`)
+    this.syncStore(true)
+  }
+
+  private queueResearch(upgradeKey: UpgradeKey): void {
+    const def = UPGRADE_DEFS[upgradeKey]
+    if (def.faction !== this.playerFaction || this.completedUpgrades.has(upgradeKey) || this.research.isQueued(upgradeKey)) return
+    if (!def.prerequisites.every((item) => this.completedUpgrades.has(item))) {
+      useGameStore.getState().setStatus('playing', `Prerequisites not met for ${def.label}.`)
+      return
+    }
+    const building = this.buildings.find((candidate) => candidate.alive && candidate.team === 'player' && candidate.kind === def.requiredBuilding)
+    if (!building) {
+      useGameStore.getState().setStatus('playing', `${buildingLabel(def.requiredBuilding, this.playerFaction)} required for ${def.label}.`)
+      return
+    }
+    if (this.credits < def.cost) {
+      useGameStore.getState().setStatus('playing', `Need $${def.cost.toLocaleString()} to research ${def.label}.`)
+      return
+    }
+    const power = this.calculatePower()
+    if (power.used > power.capacity) {
+      useGameStore.getState().setStatus('playing', 'Low power: research systems are offline.')
+      return
+    }
+    this.credits -= def.cost
+    this.research.enqueue(building, this.playerFaction, upgradeKey)
+    this.sound.play('sfx-confirm', { volume: 0.16 })
+    useGameStore.getState().setStatus('playing', `${def.label} research queued.`)
+    this.syncStore(true)
+  }
+
+  private completeProduction(building: Building, kind: UnitKind, team: 'player' | 'enemy'): void {
+    if (!building.alive) return
+    const unit = this.spawnUnit(kind, team, building.x + building.size * 0.65, building.y + building.size * 0.65)
+    if (building.rallyPoint) {
+      const goal = { x: building.rallyPoint.x, y: building.rallyPoint.y }
+      const path = this.pathfinder.findPath(unit, goal, this.buildings, this.mission.definition.world_width, this.mission.definition.world_height)
+      unit.setPath(path.map((point) => new Phaser.Math.Vector2(point.x, point.y)))
+    }
+    if (team === 'player') useGameStore.getState().setStatus('playing', `${UNIT_STATS[kind].label} ready.`)
+  }
+
+  private completeResearch(upgradeKey: UpgradeKey, team: 'player' | 'enemy'): void {
+    const target = team === 'player' ? this.completedUpgrades : this.enemyCompletedUpgrades
+    target.add(upgradeKey)
+    this.applyUpgradeEffects(team)
+    if (team === 'player') {
+      useGameStore.getState().setCompletedUpgrades([...this.completedUpgrades])
+      useGameStore.getState().setStatus('playing', `${UPGRADE_DEFS[upgradeKey].label} research complete.`)
+    }
+  }
+
+  private queueEnemyUnit(kind: UnitKind): boolean {
+    const allowed = [...FACTION_DATA[this.enemyFaction].infantry, ...FACTION_DATA[this.enemyFaction].factory]
+    if (!allowed.includes(kind)) return false
+    const stats = UNIT_STATS[kind]
+    const factories = this.buildings.filter((building) => building.alive && building.team === 'enemy' && building.kind === stats.requiredFactory)
+    const enemyPower = this.calculatePowerForTeam('enemy')
+    if (enemyPower.used > enemyPower.capacity) {
+      this.tryEnemyBuild('power')
+      return false
+    }
+    if (factories.length === 0 || this.enemyCredits < stats.cost || this.production.totalQueued('enemy') >= 5) return false
+    const factory = [...factories].sort((a, b) => this.production.queueLength(a.id) - this.production.queueLength(b.id))[0]
+    if (!factory) return false
+    this.enemyCredits -= stats.cost
+    this.production.enqueue(factory, this.enemyFaction, kind)
+    return true
+  }
+
+  private tryEnemyBuild(kind: BuildingKind): boolean {
+    const stats = BUILDING_STATS[kind]
+    if (this.enemyCredits < stats.cost) return false
+    const core = this.buildings.find((building) => building.alive && building.team === 'enemy' && building.kind === 'conyard')
+    if (!core) return false
+    const existing = this.buildings.filter((building) => building.alive && building.team === 'enemy').length
+    this.enemyBuildAttempt += 1
+    const angle = ((existing + this.enemyBuildAttempt) * 1.37) % (Math.PI * 2)
+    const radius = kind === 'refinery' ? 240 : 210
+    const x = Phaser.Math.Clamp(core.x + Math.cos(angle) * radius, stats.size, this.mission.definition.world_width - stats.size)
+    const y = Phaser.Math.Clamp(core.y + Math.sin(angle) * radius, stats.size, this.mission.definition.world_height - stats.size)
+    const overlaps = this.buildings.some((building) => building.alive && Phaser.Math.Distance.Between(building.x, building.y, x, y) < (building.size + stats.size) * 0.55)
+    if (overlaps) return false
+    this.enemyCredits -= stats.cost
+    this.spawnBuilding(kind, 'enemy', x, y)
+    return true
   }
 
   private spawnUnit(kind: UnitKind, team: 'player' | 'enemy', x: number, y: number): Unit {
     this.unitCounter += 1
     const unit = new Unit(this, `${team}-unit-${this.unitCounter}`, kind, team, x, y)
     this.units.push(unit)
+    this.applyUpgradeToUnit(unit, team)
     if (team === 'enemy' && this.fog) unit.setFogVisible(this.fog.isVisible(x, y))
     return unit
   }
@@ -718,10 +878,103 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
-  private calculatePower(): { used: number; capacity: number } {
+  private armAttackMove(): void {
+    if (this.selectedUnits.length === 0) {
+      useGameStore.getState().setStatus('playing', 'Select combat units before issuing attack-move.')
+      return
+    }
+    this.attackMoveArmed = true
+    useGameStore.getState().setAttackMoveArmed(true)
+    useGameStore.getState().setStatus('playing', 'ATTACK MOVE armed — right-click a destination. Shift+A also arms this command.')
+  }
+
+  private assignControlGroup(group: number): void {
+    const ids = this.selectedBuilding
+      ? [this.selectedBuilding.id]
+      : this.selectedUnits.map((unit) => unit.id)
+    if (ids.length === 0) return
+    this.controlGroups.set(group, ids)
+    useGameStore.getState().setStatus('playing', `Control group ${group} assigned (${ids.length}).`)
+  }
+
+  private recallControlGroup(group: number): void {
+    const ids = this.controlGroups.get(group)
+    if (!ids || ids.length === 0) return
+    this.clearSelection()
+    const unitMatches = this.units.filter((unit) => unit.alive && unit.team === 'player' && ids.includes(unit.id))
+    const buildingMatch = this.buildings.find((building) => building.alive && building.team === 'player' && ids.includes(building.id))
+    if (buildingMatch) {
+      this.selectedBuilding = buildingMatch
+      buildingMatch.setSelected(true)
+    } else {
+      this.selectedUnits = unitMatches
+      this.selectedUnits.forEach((unit) => unit.setSelected(true))
+    }
+    this.syncSelection()
+    const now = this.time.now
+    const previous = this.lastGroupRecallAt.get(group) ?? -1000
+    this.lastGroupRecallAt.set(group, now)
+    if (now - previous < 450) this.centerSelected()
+  }
+
+  private resumeAttackMoves(): void {
+    for (const unit of this.units) {
+      if (!unit.alive || !unit.attackMoveActive || unit.attackTarget || !unit.attackMoveGoal) continue
+      if (unit.distanceTo(unit.attackMoveGoal) < 28) {
+        unit.clearAttackMove()
+        continue
+      }
+      if (unit.hasMoveOrder) continue
+      const goal = { x: unit.attackMoveGoal.x, y: unit.attackMoveGoal.y }
+      const path = this.pathfinder.findPath(unit, goal, this.buildings, this.mission.definition.world_width, this.mission.definition.world_height)
+      unit.resumeAttackMove(path.map((point) => new Phaser.Math.Vector2(point.x, point.y)))
+    }
+  }
+
+  private productionSpeedMultiplier(team: 'player' | 'enemy'): number {
+    if (team === 'enemy') return Math.max(0.85, this.mission.definition.enemy.production_multiplier)
+    if (this.playerFaction === 'aegis' && this.completedUpgrades.has('aegis_reactor_optimization')) return 1.18
+    if (this.playerFaction === 'noctis' && this.completedUpgrades.has('noctis_metabolic_bloom')) return 1.18
+    return 1
+  }
+
+  private harvestMultiplier(team: 'player' | 'enemy'): number {
+    if (team === 'enemy') return 1
+    if (this.playerFaction === 'aegis' && this.completedUpgrades.has('aegis_reactor_optimization')) return 1.15
+    if (this.playerFaction === 'noctis' && this.completedUpgrades.has('noctis_metabolic_bloom')) return 1.15
+    return 1
+  }
+
+  private applyUpgradeEffects(team: 'player' | 'enemy'): void {
+    for (const unit of this.units.filter((candidate) => candidate.alive && candidate.team === team)) this.applyUpgradeToUnit(unit, team)
+  }
+
+  private applyUpgradeToUnit(unit: Unit, team: 'player' | 'enemy'): void {
+    const faction = team === 'player' ? this.playerFaction : this.enemyFaction
+    const upgrades = team === 'player' ? this.completedUpgrades : this.enemyCompletedUpgrades
+    let speed = 1
+    let damage = 1
+    let cooldown = 1
+    let visionBonus = 0
+    let rangeBonus = 0
+    let damageReduction = 0
+
+    if (faction === 'aegis') {
+      if (upgrades.has('aegis_composite_plating')) damageReduction += 0.12
+      if (upgrades.has('aegis_targeting_ai')) { damage *= 1.12; visionBonus += 30 }
+      if (upgrades.has('aegis_aerospace_command') && unit.isFlying) visionBonus += 60
+    } else {
+      if (upgrades.has('noctis_carapace_grafting')) damageReduction += 0.12
+      if (upgrades.has('noctis_synaptic_acceleration')) { speed *= 1.12; cooldown *= 0.90 }
+      if (upgrades.has('noctis_acid_evolution') && unit.kind === 'spitter') { damage *= 1.20; rangeBonus += 35 }
+    }
+    unit.applyUpgradeModifiers({ speed, damage, cooldown, visionBonus, rangeBonus, damageReduction })
+  }
+
+  private calculatePowerForTeam(team: 'player' | 'enemy'): { used: number; capacity: number } {
     let used = 0
     let capacity = 0
-    for (const building of this.buildings.filter((item) => item.alive && item.team === 'player')) {
+    for (const building of this.buildings.filter((item) => item.alive && item.team === team)) {
       const power = BUILDING_STATS[building.kind].power
       if (power < 0) capacity += Math.abs(power)
       else used += power
@@ -729,9 +982,18 @@ export class BattleScene extends Phaser.Scene {
     return { used, capacity }
   }
 
+  private calculatePower(): { used: number; capacity: number } {
+    return this.calculatePowerForTeam('player')
+  }
+
   private syncStore(forceSelection: boolean): void {
     const power = this.calculatePower()
-    useGameStore.getState().setEconomy(Math.round(this.credits), power.used, power.capacity)
+    const store = useGameStore.getState()
+    store.setEconomy(Math.round(this.credits), power.used, power.capacity)
+    store.setProductionQueues(this.production?.getPlayerViews() ?? [])
+    store.setResearchQueues(this.research?.getPlayerViews() ?? [])
+    store.setCompletedUpgrades([...this.completedUpgrades])
+    store.setAttackMoveArmed(this.attackMoveArmed)
     if (forceSelection || this.selectedUnits.length > 0 || this.selectedBuilding) this.syncSelection()
   }
 

@@ -48,7 +48,7 @@ export class CombatSystem {
       }
 
       if (distance > unit.range) {
-        if (unit.attackTargetMode === 'manual' || !unit.hasMoveOrder) {
+        if (unit.attackTargetMode === 'manual' || !unit.hasMoveOrder || unit.attackMoveActive) {
           unit.moveDirectlyToward(target, delta)
         }
         continue

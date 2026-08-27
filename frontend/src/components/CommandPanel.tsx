@@ -45,10 +45,12 @@ export function CommandPanel() {
             <button disabled={!kinds.has('wraith')} onClick={() => gameBus.emit('activate-ability', 'phase')}>Phase Veil</button>
           </>
         )}
+        <button className={state.attackMoveArmed ? 'command-active' : ''} onClick={() => gameBus.emit('arm-attack-move', undefined)}>Attack Move</button>
         <button onClick={() => gameBus.emit('center-selected', undefined)}>Center</button>
         <button onClick={() => gameBus.emit('stop-selected', undefined)}>Stop</button>
         <button onClick={() => void quickSave()}>{saveLabel}</button>
       </div>
+      <p className="muted command-hint">Shift+A: attack-move · Ctrl+1–9: assign group · 1–9: recall · right-click selected production building: set rally point.</p>
       <div className="command-footer"><button onClick={() => gameBus.emit('restart-game', undefined)}>Restart Mission</button></div>
     </section>
   )

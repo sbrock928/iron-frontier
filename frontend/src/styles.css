@@ -257,3 +257,30 @@ body {
   box-shadow: inset 0 0 0 1px #9a66aa, 0 0 12px #a465c833;
 }
 .faction-noctis .status-dot { background: #c680ff; box-shadow: 0 0 9px #c680ff; }
+
+/* Production queues, tech tree, and tactical polish */
+.asset-button:disabled { opacity: .48; cursor: not-allowed; filter: grayscale(.25); }
+.queue-title { margin-top: 14px; }
+.production-queue { margin-top: 8px; padding: 8px; border: 1px solid #33493e; background: #0d1511; }
+.queue-head, .queue-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.queue-head strong { font-size: 9px; color: #d7e8dd; text-transform: uppercase; letter-spacing: .08em; }
+.queue-head span, .queue-foot span { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 8px; color: #829a8c; }
+.queue-progress { height: 6px; margin: 7px 0; border: 1px solid #2f4138; background: #080d0a; overflow: hidden; }
+.queue-progress i { display: block; height: 100%; background: linear-gradient(90deg, #4ebf97, #92f0c4); box-shadow: 0 0 8px rgba(102,232,221,.25); }
+.faction-noctis .queue-progress i { background: linear-gradient(90deg, #724a9c, #c684ff); box-shadow: 0 0 8px rgba(198,132,255,.25); }
+.queue-foot button { min-height: 24px; padding: 3px 7px; border: 1px solid #4a5e53; background: #151e19; color: #a9bbb0; font-size: 8px; cursor: pointer; }
+.tech-tree { display: grid; gap: 7px; }
+.tech-node { width: 100%; padding: 9px; text-align: left; border: 1px solid #3a4d43; background: linear-gradient(180deg,#172119,#0d1410); color: #cddbd2; cursor: pointer; }
+.tech-node.tier-2 { margin-left: 12px; width: calc(100% - 12px); border-left: 3px solid #5e8f78; }
+.tech-node > div { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.tech-node strong { font-size: 10px; }
+.tech-node span, .tech-node small { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 8px; color: #789184; }
+.tech-node p { margin: 6px 0; color: #94a89c; font-size: 9px; line-height: 1.35; }
+.tech-node.done { border-color: #507e68; background: linear-gradient(180deg,#1b3025,#102018); }
+.tech-node.done small { color: #80d7a7; }
+.tech-node:disabled:not(.done) { opacity: .58; cursor: not-allowed; }
+.faction-noctis .tech-node.tier-2 { border-left-color: #8157a6; }
+.faction-noctis .tech-node.done { border-color: #8055a7; background: linear-gradient(180deg,#2b1d35,#160f1d); }
+.command-panel button.command-active { border-color: #91eec0; box-shadow: inset 0 0 0 1px #62b993, 0 0 12px rgba(99,220,170,.2); color: #d9ffe9; }
+.faction-noctis .command-panel button.command-active { border-color: #c684ff; box-shadow: inset 0 0 0 1px #8b55b4, 0 0 12px rgba(198,132,255,.2); }
+.command-hint { margin: 9px 0 0; font-size: 8px; line-height: 1.5; }

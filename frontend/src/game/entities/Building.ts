@@ -22,6 +22,8 @@ export class Building implements Damageable {
   private readonly healthFront: Phaser.GameObjects.Rectangle
   private readonly selection: Phaser.GameObjects.Ellipse
   lastShotAt = 0
+  rallyPoint: Phaser.Math.Vector2 | null = null
+  private rallyMarker: Phaser.GameObjects.Ellipse | null = null
 
   constructor(scene: Phaser.Scene, id: string, kind: BuildingKind, team: Team, faction: Faction, x: number, y: number) {
     const stats = BUILDING_STATS[kind]
@@ -89,6 +91,15 @@ export class Building implements Damageable {
     this.body.scene.tweens.add({ targets: this.body, alpha: 0.62, duration: 90, yoyo: true, onComplete: () => this.body.setAlpha(1) })
   }
 
+  setRallyPoint(x: number, y: number): void {
+    this.rallyPoint = new Phaser.Math.Vector2(x, y)
+    if (!this.rallyMarker) {
+      this.rallyMarker = this.body.scene.add.ellipse(x, y, 30, 18, 0x6cf0d0, 0.12).setStrokeStyle(2, this.team === 'player' ? 0x7ff6d8 : 0xd68cff).setDepth(9500)
+    } else {
+      this.rallyMarker.setPosition(x, y).setVisible(true)
+    }
+  }
+
   contains(x: number, y: number): boolean {
     return Math.abs(x - this.x) <= this.size / 2 && Math.abs(y - this.y) <= this.size * 0.39
   }
@@ -125,6 +136,6 @@ export class Building implements Damageable {
       if (!wreck.active) return
       scene.tweens.add({ targets: wreck, alpha: 0, duration: 6000, onComplete: () => wreck.destroy() })
     })
-    this.shadow.destroy(); this.glow.destroy(); this.body.destroy(); this.label.destroy(); this.healthBack.destroy(); this.healthFront.destroy(); this.selection.destroy()
+    this.rallyMarker?.destroy(); this.shadow.destroy(); this.glow.destroy(); this.body.destroy(); this.label.destroy(); this.healthBack.destroy(); this.healthFront.destroy(); this.selection.destroy()
   }
 }

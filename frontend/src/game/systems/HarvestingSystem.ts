@@ -1,3 +1,4 @@
+import type { Team } from '../../types'
 import type { Building } from '../entities/Building'
 import type { ResourcePatch } from '../entities/ResourcePatch'
 import type { Unit } from '../entities/Unit'
@@ -8,12 +9,13 @@ export class HarvestingSystem {
     units: Unit[],
     buildings: Building[],
     patches: ResourcePatch[],
-    addCredits: (amount: number) => void,
+    addCredits: (team: Team, amount: number) => void,
+    harvestMultiplier: (team: Team) => number = () => 1,
   ): void {
-    const refineries = buildings.filter((building) => building.alive && building.team === 'player' && building.kind === 'refinery')
-    if (refineries.length === 0) return
-
-    for (const harvester of units.filter((unit) => unit.alive && unit.team === 'player' && (unit.kind === 'harvester' || unit.kind === 'drone'))) {
+    const workers = units.filter((unit) => unit.alive && (unit.kind === 'harvester' || unit.kind === 'drone'))
+    for (const harvester of workers) {
+      const refineries = buildings.filter((building) => building.alive && building.team === harvester.team && building.kind === 'refinery')
+      if (refineries.length === 0) continue
       const refinery = this.nearest(harvester, refineries)
       const patch = this.nearest(harvester, patches.filter((item) => item.amount > 0))
       if (!refinery || !patch) continue
@@ -23,7 +25,7 @@ export class HarvestingSystem {
         if (harvester.distanceTo(refinery) > 65) {
           harvester.moveDirectlyToward(refinery, deltaMs)
         } else {
-          addCredits(harvester.cargo)
+          addCredits(harvester.team, harvester.cargo)
           harvester.cargo = 0
           harvester.harvestState = 'seeking'
         }
@@ -40,7 +42,7 @@ export class HarvestingSystem {
       harvester.harvestTimer += deltaMs
       if (harvester.harvestTimer >= 450) {
         harvester.harvestTimer = 0
-        harvester.cargo += patch.harvest(70)
+        harvester.cargo += patch.harvest(Math.round(70 * harvestMultiplier(harvester.team)))
       }
     }
   }

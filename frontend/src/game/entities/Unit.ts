@@ -49,6 +49,14 @@ export class Unit implements Damageable {
   acidBurstUntil = 0
   phaseUntil = 0
   lastHealAt = 0
+  attackMoveActive = false
+  attackMoveGoal: Phaser.Math.Vector2 | null = null
+  private speedModifier = 1
+  private damageModifier = 1
+  private cooldownModifier = 1
+  private visionBonus = 0
+  private rangeBonus = 0
+  private damageReduction = 0
 
   constructor(scene: Phaser.Scene, id: string, kind: UnitKind, team: Team, x: number, y: number) {
     this.id = id
@@ -86,35 +94,35 @@ export class Unit implements Damageable {
     if (this.phaseUntil > 0) value *= 1.48
     if (this.stimUntil > 0) value *= 1.28
     if (this.frenzyUntil > 0) value *= 1.32
-    return value
+    return value * this.speedModifier
   }
   get range(): number {
     let value = this.baseStats.range
     if (this.siegeMode) value += 120
     if (this.acidBurstUntil > 0) value += 70
-    return value
+    return value + this.rangeBonus
   }
   get acquireRange(): number {
     let value = this.baseStats.acquireRange
     if (this.siegeMode) value += 120
     if (this.acidBurstUntil > 0) value += 70
-    return value
+    return value + this.rangeBonus
   }
-  get vision(): number { return this.baseStats.vision + (this.isFlying ? 70 : 0) }
+  get vision(): number { return this.baseStats.vision + (this.isFlying ? 70 : 0) + this.visionBonus }
   get damage(): number {
     let value = this.baseStats.damage
     if (this.siegeMode) value += 18
     if (this.stimUntil > 0) value *= 1.20
     if (this.frenzyUntil > 0) value *= 1.24
     if (this.acidBurstUntil > 0) value *= 1.32
-    return Math.round(value)
+    return Math.round(value * this.damageModifier)
   }
   get cooldown(): number {
     let value = this.baseStats.cooldown
     if (this.stimUntil > 0) value *= 0.78
     if (this.frenzyUntil > 0) value *= 0.76
     if (this.acidBurstUntil > 0) value *= 0.86
-    return Math.max(220, Math.round(value))
+    return Math.max(220, Math.round(value * this.cooldownModifier))
   }
   get hasMoveOrder(): boolean { return this.path.length > 0 }
 
@@ -135,11 +143,32 @@ export class Unit implements Damageable {
 
   setPath(points: Phaser.Math.Vector2[]): void {
     this.path = points
+    this.attackMoveActive = false
+    this.attackMoveGoal = null
     this.clearAttackTarget()
+  }
+
+  setAttackMovePath(points: Phaser.Math.Vector2[], goal: Phaser.Math.Vector2): void {
+    this.path = points
+    this.attackMoveActive = true
+    this.attackMoveGoal = goal.clone()
+    this.clearAttackTarget()
+  }
+
+  resumeAttackMove(points: Phaser.Math.Vector2[]): void {
+    if (!this.attackMoveActive) return
+    this.path = points
+  }
+
+  clearAttackMove(): void {
+    this.attackMoveActive = false
+    this.attackMoveGoal = null
   }
 
   setAttackTarget(target: Damageable): void {
     this.path = []
+    this.attackMoveActive = false
+    this.attackMoveGoal = null
     this.attackTarget = target
     this.attackTargetMode = 'manual'
   }
@@ -156,8 +185,26 @@ export class Unit implements Damageable {
 
   stop(): void {
     this.path = []
+    this.attackMoveActive = false
+    this.attackMoveGoal = null
     this.clearAttackTarget()
     this.setMoving(false)
+  }
+
+  nudge(dx: number, dy: number): void {
+    if (!this.alive) return
+    this.x += dx
+    this.y += dy
+    this.syncGraphics()
+  }
+
+  applyUpgradeModifiers(modifiers: { speed?: number; damage?: number; cooldown?: number; visionBonus?: number; rangeBonus?: number; damageReduction?: number }): void {
+    this.speedModifier = modifiers.speed ?? 1
+    this.damageModifier = modifiers.damage ?? 1
+    this.cooldownModifier = modifiers.cooldown ?? 1
+    this.visionBonus = modifiers.visionBonus ?? 0
+    this.rangeBonus = modifiers.rangeBonus ?? 0
+    this.damageReduction = modifiers.damageReduction ?? 0
   }
 
   distanceTo(target: { x: number; y: number }): number {
@@ -279,7 +326,7 @@ export class Unit implements Damageable {
 
   takeDamage(amount: number): void {
     if (!this.alive) return
-    this.hp -= amount
+    this.hp -= amount * (1 - this.damageReduction)
     if (this.hp <= 0) {
       this.alive = false
       this.destroy()

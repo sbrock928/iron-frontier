@@ -288,3 +288,57 @@ The game now supports selecting either faction from the Scenario panel before/du
 - Brood Frenzy / Acid Surge / Phase Veil
 
 Both factions can harvest resources, construct a full base, produce units, use faction-specific abilities, and fight the opposing race in all seeded mission/skirmish scenarios.
+
+## Production, tech-tree, and tactical systems pass
+
+This build adds the RTS systems that turn the prototype production loop into a much more traditional competitive RTS flow.
+
+### Real production queues
+- Barracks / Spawn Pits and War Factories / Gene Forges each maintain independent FIFO queues.
+- Clicking a unit repeatedly adds multiple copies to the least-busy compatible production building.
+- The React sidebar shows the active item, live percentage progress, queued count, and a cancel/refund action.
+- Newly produced units obey the rally point of the building that produced them.
+- Production-speed upgrades alter actual queue completion time.
+
+### Rally points
+- Select a Barracks, Spawn Pit, War Factory, or Gene Forge and right-click the battlefield to assign its rally point.
+- Finished units pathfind toward that location automatically.
+
+### Race-specific technology trees
+**Aegis Expeditionary**
+- Composite Plating
+- Targeting AI
+- Reactor Optimization
+- Siege Doctrine → unlocks Siege Artillery
+- Aerospace Command → unlocks Gunships
+
+**Noctis Brood**
+- Carapace Grafting
+- Synaptic Acceleration
+- Metabolic Bloom
+- Acid Evolution
+- Alpha Mauler Strain → unlocks Brute Maulers
+- Phase Brood → unlocks Wraith Fliers
+
+Research has costs, prerequisites, building requirements, queues, and live progress bars. Combat/economy upgrades modify the live simulation rather than acting as UI-only unlocks.
+
+### Tactical controls
+- **Attack Move:** click the Attack Move command or press `Shift+A`, then right-click a destination.
+- **Control groups:** `Ctrl+1` through `Ctrl+9` assigns the current selection; `1` through `9` recalls it. Double-tap a group number to center the camera.
+- **Stop:** cancels movement, attack orders, and attack-move state.
+- Existing unit abilities remain faction-specific.
+
+### Movement polish
+A local-avoidance/separation system now keeps friendly units from stacking directly on top of one another while moving in groups.
+
+### Economy-driven enemy AI
+The enemy no longer receives free scripted attack-wave units. It now:
+- starts with a refinery and worker
+- harvests the same finite resource patches as the player
+- pays credits for workers and combat units
+- uses the same timed production queues
+- rebuilds lost critical infrastructure when it can afford to
+- builds extra defenses / refineries over time
+- respects its power grid and builds additional power when overloaded
+- escalates its unit composition over the course of the match
+- launches attacks using units it actually owns

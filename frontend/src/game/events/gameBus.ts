@@ -1,9 +1,11 @@
-import type { BuildingKind, UnitKind } from '../../types'
+import type { BuildingKind, UnitKind, UpgradeKey } from '../../types'
 import type { AbilityKey } from '../config'
 
 type Events = {
   'build-structure': BuildingKind
   'produce-unit': UnitKind
+  'research-upgrade': UpgradeKey
+  'cancel-production': string
   'restart-game': undefined
   'save-game': undefined
   'placement-pointer-move': { u: number; v: number }
@@ -11,6 +13,7 @@ type Events = {
   'cancel-placement': undefined
   'stop-selected': undefined
   'center-selected': undefined
+  'arm-attack-move': undefined
   'activate-ability': AbilityKey
 }
 

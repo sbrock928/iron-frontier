@@ -7,6 +7,7 @@ import { MissionPanel } from './components/MissionPanel'
 import { SelectionPanel } from './components/SelectionPanel'
 import { StatusBar } from './components/StatusBar'
 import { TopBar } from './components/TopBar'
+import { TechPanel } from './components/TechPanel'
 import { useGameStore } from './store/gameStore'
 import type { Faction, Mission } from './types'
 
@@ -67,6 +68,7 @@ export default function App() {
         <aside className="sidebar">
           <BuildPanel />
           <SelectionPanel />
+          <TechPanel />
           <MissionPanel missionId={missionId} faction={faction} onMissionChange={setMissionId} onFactionChange={handleFactionChange} />
           <CommandPanel />
         </aside>

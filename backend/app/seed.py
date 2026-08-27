@@ -16,7 +16,7 @@ MISSION_01: dict[str, object] = {
     ],
     "objectives": [
         {"id": "economy", "label": "Establish a functioning economy", "type": "earn", "target": "credits"},
-        {"id": "destroy", "label": "Destroy the alien hive-yard", "type": "destroy", "target": "enemy_conyard"},
+        {"id": "destroy", "label": "Destroy the hostile command core", "type": "destroy", "target": "enemy_conyard"},
     ],
     "enemy": {
         "attack_interval_seconds": 32,
@@ -38,8 +38,8 @@ MISSION_02: dict[str, object] = {
         {"x": 2050, "y": 820},
     ],
     "objectives": [
-        {"id": "air", "label": "Field a gunship wing and maintain air presence", "type": "build", "target": "gunship"},
-        {"id": "destroy", "label": "Break the central Brood hive-yard", "type": "destroy", "target": "enemy_conyard"},
+        {"id": "air", "label": "Unlock and field your faction advanced air unit", "type": "build", "target": "advanced_air"},
+        {"id": "destroy", "label": "Break the central hostile command core", "type": "destroy", "target": "enemy_conyard"},
     ],
     "enemy": {
         "attack_interval_seconds": 26,
@@ -76,19 +76,19 @@ MISSIONS = [
     (
         "mission_01",
         "Operation Iron Dawn",
-        "Build an economy, field Aegis mechanized forces, and wipe out the Noctis Brood hive-yard.",
+        "Build an economy, climb your faction tech tree, and destroy the opposing command core.",
         MISSION_01,
     ),
     (
         "mission_02",
         "Black Skies Counterstroke",
-        "Push into the Brood frontier, unlock gunship support, and break a reinforced alien fortress.",
+        "Push into a fortified frontier, unlock advanced air technology, and break the opposing fortress.",
         MISSION_02,
     ),
     (
         "skirmish_01",
         "Ash Meridian Skirmish",
-        "A larger sandbox skirmish with denser ore lanes, bigger enemy waves, and full Aegis tech access.",
+        "A larger sandbox skirmish with denser ore lanes, a full faction tech tree, and an economy-driven enemy AI.",
         SKIRMISH_01,
     ),
 ]
