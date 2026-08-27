@@ -1,0 +1,22 @@
+{
+  "name": "iron-frontier-art-pipeline",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Standalone Node CLI toolchain that generates, post-processes and atlas-packs Iron Frontier's art assets. Kept separate from frontend/package.json because these scripts run in Node (fs, sharp) rather than the browser, and pull in dependencies (sharp, an image-generation client) that the Vite app itself must never bundle.",
+  "scripts": {
+    "art:gen": "tsx gen-art.ts",
+    "art:process": "tsx process-art.ts",
+    "art:pack": "tsx pack-atlas.ts",
+    "art:all": "npm run art:gen && npm run art:process && npm run art:pack"
+  },
+  "dependencies": {
+    "sharp": "^0.33.5",
+    "free-tex-packer-core": "^0.3.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "~5.7.2",
+    "@types/node": "^22.10.2"
+  }
+}

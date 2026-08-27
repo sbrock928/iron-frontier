@@ -1,0 +1,59 @@
+{
+  "$comment": "Prompt manifest for building sprites. Each entry is generated three times, once per faction variant, using the faction's form language from art/style.md. `seedBase` is offset per faction (0=aegis, 1=noctis, 2=veyra) to keep generations reproducible and distinct.",
+  "buildings": {
+    "conyard": {
+      "seedBase": 200100,
+      "aegis": "a large hexagonal industrial command headquarters building viewed from directly above, olive-drab and gunmetal modular armour panels, a central raised command tower with a rotating radar dish, floodlights, vehicle bay doors, cable conduits and a landing pad marking. Weathered paint, exhaust staining.",
+      "noctis": "a large organic hive command structure viewed from directly above, grown from layered bruised purple-black chitin plates, a central pulsating bio-core visible through a ribbed membrane dome, veined tendrils anchoring it to the ground, glowing violet bioluminescent seams and small brood sacs clustered at the base.",
+      "veyra": "a large elegant crystalline command nexus viewed from directly above, a radially symmetric white-gold ceramic structure with a massive glowing amethyst crystal core at the centre, floating unsupported outer ring segments hovering above the ground, hairline energy channels radiating outward, serene and monumental."
+    },
+    "power": {
+      "seedBase": 200200,
+      "aegis": "a compact fusion reactor building viewed from directly above, a cylindrical containment core surrounded by radial cooling fins, exposed pipework, warning stripes, venting steam and cyan reactor glow visible through a reinforced viewport grid. Olive-drab and gunmetal.",
+      "noctis": "a bulbous organic spore reactor structure viewed from directly above, a pulsating membranous sac ribbed with dark chitin struts, venting spore clouds from small vents, glowing violet internal light diffusing through the thin membrane, root tendrils gripping the ground.",
+      "veyra": "a slender crystalline flux pylon viewed from directly above, a tapering white-gold ceramic spire with a glowing amethyst crystal suspended at its core, three floating unsupported energy rings orbiting the shaft at different heights, hairline light channels radiating outward."
+    },
+    "refinery": {
+      "seedBase": 200300,
+      "aegis": "an industrial ore refinery and processing plant viewed from directly above, large storage silos, conveyor gantries, smokestacks with light haze, loading docks with ore chutes, pipework and hazard-striped catwalks. Olive-drab and gunmetal, rust streaks.",
+      "noctis": "an organic biomass processing structure viewed from directly above, a cluster of swollen digestive sacs connected by ribbed tendon conduits, a central grinding maw-like intake, dripping enzymatic residue, glowing violet internal bioluminescence.",
+      "veyra": "an elegant crystalline resource assimilator viewed from directly above, a radial arrangement of tall faceted amethyst crystal spires around a central white-gold ceramic collector dish, floating unsupported conduits linking them, hairline glowing energy channels."
+    },
+    "barracks": {
+      "seedBase": 200400,
+      "aegis": "a military infantry training and deployment barracks building viewed from directly above, a long modular structure with a vehicle entrance bay, antenna mast, stacked shipping-style module blocks, floodlights and hazard-striped doors. Olive-drab and gunmetal, weathered.",
+      "noctis": "an organic spawning pit structure viewed from directly above, a wide fleshy pit ringed by ribbed chitin walls, a central birthing sac pulsating with violet light, larval chitin husks scattered around the rim, wet organic sheen.",
+      "veyra": "an ornate crystalline disciple gate viewed from directly above, twin curved white-gold ceramic archway pillars framing a shimmering amethyst energy portal at the centre, floating unsupported halo rings above each pillar, hairline glowing channels."
+    },
+    "warfactory": {
+      "seedBase": 200500,
+      "aegis": "a heavy vehicle production war factory building viewed from directly above, a large industrial hall with a wide roller door, overhead gantry crane rails, stacked armour plating stock, welding sparks and stencilled hazard markings. Olive-drab and gunmetal.",
+      "noctis": "a massive organic gene forge structure viewed from directly above, a cavernous ribbed chitin dome with a central mutation vat glowing deep violet, thick tendon conduits feeding into it, dripping amniotic fluid at the exit maw.",
+      "veyra": "a grand crystalline forge sanctum viewed from directly above, a wide circular white-gold ceramic platform ringed by tall faceted amethyst crystal pillars, a glowing forging matrix at the centre, floating unsupported architecture, serene symmetry."
+    },
+    "airfield": {
+      "seedBase": 200600,
+      "aegis": "a military airfield flight control building viewed from directly above, a control tower with radar array, an adjoining hangar with open bay doors, a painted landing pad chevron, fuel tanks and runway edge lighting. Olive-drab and gunmetal.",
+      "noctis": "an organic sky nest structure viewed from directly above, a tall ribbed chitin spire with wide membrane launch platforms extending outward like wings, roosting alcoves, glowing violet bioluminescent veins, wet organic sheen.",
+      "veyra": "an elegant crystalline star portal viewed from directly above, a large circular white-gold ceramic ring standing on end conceptually flattened to a top-down glowing amethyst portal disc, floating unsupported outer struts, radiant energy patterns."
+    },
+    "techlab": {
+      "seedBase": 200700,
+      "aegis": "a military science research directorate building viewed from directly above, a hexagonal facility with satellite dishes, a glowing cyan holo-projection dome, server racks visible through windows, cable trays and antenna clusters. Olive-drab and gunmetal.",
+      "noctis": "an organic cerebral nexus structure viewed from directly above, a large exposed ribbed brain-like mass suspended within a chitin cage, pulsing violet synaptic light, thin tendrils connecting it to the ground, wet glistening membrane.",
+      "veyra": "a tall crystalline archive spire viewed from directly above, a slender white-gold ceramic tower surrounded by floating unsupported concentric data-rings inlaid with amethyst crystal, glowing glyphs etched into the surface, serene."
+    },
+    "turret": {
+      "seedBase": 200800,
+      "aegis": "a compact automated defense turret emplacement viewed from directly above, a rotating twin-barrel autocannon mount on an armoured bunker base, ammo feed belts, targeting sensor cluster, sandbag revetment. Olive-drab and gunmetal.",
+      "noctis": "an organic spine cannon structure viewed from directly above, a cluster of rigid bone spines erupting from a fleshy pulsating base, one spine cocked back ready to launch, glowing violet pressure sac at the root.",
+      "veyra": "an elegant crystalline prism battery viewed from directly above, a rotating faceted amethyst crystal lens mounted on a slender white-gold ceramic pedestal, floating unsupported focusing rings, a glowing charge core beneath."
+    },
+    "detector": {
+      "seedBase": 200900,
+      "aegis": "a compact sensor array building viewed from directly above, a small hardened bunker topped with a rotating dish and a cluster of thin whip antennae, a blinking cyan status light, cable spool at the base. Olive-drab and gunmetal.",
+      "noctis": "an organic seer node structure viewed from directly above, a small clustered stalk of eye-like bioluminescent sensory pods on short fleshy stalks, glowing violet, surrounded by fine sensing filaments radiating outward.",
+      "veyra": "an ornate crystalline oracle beacon viewed from directly above, a small floating unsupported amethyst crystal shard hovering above a white-gold ceramic base ring, radiating a faint visible sensor field pattern, serene glow."
+    }
+  }
+}

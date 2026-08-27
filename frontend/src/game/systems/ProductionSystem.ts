@@ -43,6 +43,22 @@ export class ProductionSystem {
     return count
   }
 
+  /**
+   * Supply already committed to units that are queued or being built.
+   *
+   * Counted against the cap alongside living units so that filling several
+   * factory queues at once cannot overshoot it — without this, a player with a
+   * single free supply slot could start a unit in every factory simultaneously.
+   */
+  queuedSupply(team: Team): number {
+    let supply = 0
+    for (const queue of this.queues.values()) {
+      if (queue.building.team !== team || !queue.building.alive) continue
+      for (const item of queue.items) supply += UNIT_STATS[item.kind].supply
+    }
+    return supply
+  }
+
   cancelFirst(buildingId: string): UnitKind | null {
     const queue = this.queues.get(buildingId)
     if (!queue || queue.items.length === 0) return null
@@ -77,16 +93,20 @@ export class ProductionSystem {
   getPlayerViews() {
     return [...this.queues.values()]
       .filter((queue) => queue.building.alive && queue.building.team === 'player')
-      .map((queue) => {
+      .flatMap((queue) => {
+        // Empty queues are deleted by `update`/`cancelFirst`, so this should
+        // never fire; returning nothing rather than an "Idle" placeholder means
+        // a leak can't surface a ghost row with a live cancel button.
         const active = queue.items[0]
-        return {
+        if (!active) return []
+        return [{
           buildingId: queue.building.id,
           buildingLabel: buildingLabel(queue.building.kind, queue.faction),
-          activeKind: active?.kind ?? null,
-          activeLabel: active ? UNIT_STATS[active.kind].label : 'Idle',
-          progress: active ? Math.max(0, Math.min(1, 1 - active.remainingMs / active.totalMs)) : 0,
+          activeKind: active.kind,
+          activeLabel: UNIT_STATS[active.kind].label,
+          progress: Math.max(0, Math.min(1, 1 - active.remainingMs / active.totalMs)),
           queuedKinds: queue.items.slice(1).map((item) => item.kind),
-        }
+        }]
       })
   }
 }

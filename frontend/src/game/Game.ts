@@ -17,5 +17,8 @@ export function createGame(parent: HTMLElement, mission: Mission, faction: Facti
       antialias: true,
       pixelArt: false,
     },
+    // Raised from Phaser's default of 10 so a busy firefight's muzzle-flash
+    // and explosion lights (see CombatSystem) don't get silently dropped.
+    maxLights: 24,
   })
 }

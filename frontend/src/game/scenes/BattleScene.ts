@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
-import type { BuildingKind, Difficulty, Faction, Mission, UnitKind, UpgradeKey } from '../../types'
+import type { AlertSeverity, BuildingKind, Difficulty, Faction, MinimapBlip, Mission, UnitKind, UpgradeKey } from '../../types'
 import { useGameStore } from '../../store/gameStore'
-import { ALL_BUILDING_KINDS, ALL_UNIT_KINDS, BUILDING_STATS, BUILDING_TEXTURES, DIFFICULTY_DATA, FACTION_DATA, UNIT_STATS, UPGRADE_DEFS, buildingLabel, isUnitUnlocked } from '../config'
+import { BUILDING_STATS, DIFFICULTY_DATA, FACTION_DATA, MAX_SUPPLY, UNIT_STATS, UPGRADE_DEFS, buildingAtlasFrame, buildingLabel, isUnitUnlocked } from '../config'
 import { Building } from '../entities/Building'
 import type { Damageable } from '../entities/Damageable'
 import { ResourcePatch } from '../entities/ResourcePatch'
@@ -12,10 +12,42 @@ import { EnemyAI } from '../systems/EnemyAI'
 import { FogOfWarSystem } from '../systems/FogOfWarSystem'
 import { HarvestingSystem } from '../systems/HarvestingSystem'
 import { Pathfinder } from '../systems/Pathfinder'
+import { generateTerrainFeatures } from '../systems/TerrainGenerator'
 import { SupportSystem } from '../systems/SupportSystem'
 import { ProductionSystem } from '../systems/ProductionSystem'
 import { ResearchSystem } from '../systems/ResearchSystem'
 import { LocalAvoidanceSystem } from '../systems/LocalAvoidanceSystem'
+import { ControlGroupManager } from '../systems/ControlGroupManager'
+
+/**
+ * Lighting rig. These values deliberately mirror the lighting described in the
+ * art pipeline's shared prompt preamble (scripts/art/shared.ts) and art/style.md,
+ * so the dynamic lighting reinforces the highlights already baked into every
+ * sprite instead of fighting them. If you change the key direction here, change
+ * it there too and regenerate, or sprites will be lit from two directions at once.
+ */
+
+/** Base light present everywhere; keeps unlit faces readable without washing out the key. */
+const AMBIENT_COLOR = 0x39423f
+/** Screen-space angle the key light arrives from, in degrees, measured like Phaser's world angles (+x right, +y down). 215 deg points up and to the left. */
+const KEY_LIGHT_ANGLE_DEG = 215
+/** Elevation of the key and fill above the ground plane, in degrees. Shallow angles give long, dramatic relief; steep angles flatten it. */
+const LIGHT_ELEVATION_DEG = 35
+/** How far off-map the lights sit, as a multiple of the map's longest side. Higher is more parallel and sun-like. */
+const LIGHT_SPREAD_FACTOR = 3
+/** Multiplier applied to the furthest-fragment distance when sizing light radius. 1.0 would leave the far corner pitch black. */
+const LIGHT_RADIUS_HEADROOM = 1.9
+/** Warm sunlight. */
+const KEY_LIGHT_COLOR = 0xffe9c4
+const KEY_LIGHT_INTENSITY = 1.15
+/** Cool blue-grey bounce opposite the key, so shadowed faces read as shadow rather than as black. */
+const FILL_LIGHT_COLOR = 0x8fb4d8
+const FILL_LIGHT_INTENSITY = 0.45
+
+/** How often the DOM minimap is sent a fresh snapshot, in ms. */
+const MINIMAP_EMIT_INTERVAL_MS = 100
+/** Length of the rolling window used to derive the credits-per-minute readout, in ms. */
+const INCOME_WINDOW_MS = 20000
 
 export class BattleScene extends Phaser.Scene {
   private readonly mission: Mission
@@ -44,13 +76,19 @@ export class BattleScene extends Phaser.Scene {
   private readonly completedUpgrades = new Set<UpgradeKey>()
   private readonly enemyCompletedUpgrades = new Set<UpgradeKey>()
   private attackMoveArmed = false
-  private readonly controlGroups = new Map<number, string[]>()
-  private readonly lastGroupRecallAt = new Map<number, number>()
+  private readonly controlGroups = new ControlGroupManager()
   private dragStart: Phaser.Math.Vector2 | null = null
   private selectionBox: Phaser.GameObjects.Rectangle | null = null
   private placementKind: BuildingKind | null = null
   private placementGhost: Phaser.GameObjects.Image | null = null
   private nextStoreSyncAt = 0
+  private nextMinimapEmitAt = 0
+  /**
+   * Rolling window of the player's harvester deposits, used to derive a credits
+   * per minute readout. Entries older than INCOME_WINDOW_MS are dropped on each
+   * sample, so the figure reflects current harvesting rather than the whole match.
+   */
+  private incomeSamples: Array<{ at: number; amount: number }> = []
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys
   private keys: Record<string, Phaser.Input.Keyboard.Key> = {}
   private unsubscribers: Array<() => void> = []
@@ -58,7 +96,6 @@ export class BattleScene extends Phaser.Scene {
   private edgePanX = 0
   private edgePanY = 0
   private readonly edgePanMargin = 34
-  private readonly minimapRect = new Phaser.Geom.Rectangle(16, 16, 188, 110)
   private audioStarted = false
   private ambientSound: Phaser.Sound.BaseSound | null = null
 
@@ -72,22 +109,15 @@ export class BattleScene extends Phaser.Scene {
 
   preload(): void {
     this.load.setPath('/')
-    this.load.image('terrain-ground', 'assets/terrain/ground_tile.png')
+    this.load.atlas('units', 'assets/atlas/units.png', 'assets/atlas/units.json')
+    this.load.atlas('units-normal', 'assets/atlas/units-normal.png', 'assets/atlas/units-normal.json')
+    this.load.atlas('units-shadow', 'assets/atlas/units-shadow.png', 'assets/atlas/units-shadow.json')
+    this.load.atlas('buildings', 'assets/atlas/buildings.png', 'assets/atlas/buildings.json')
+    this.load.atlas('buildings-normal', 'assets/atlas/buildings-normal.png', 'assets/atlas/buildings-normal.json')
+    this.load.atlas('buildings-shadow', 'assets/atlas/buildings-shadow.png', 'assets/atlas/buildings-shadow.json')
+    this.load.atlas('terrain', 'assets/atlas/terrain.png', 'assets/atlas/terrain.json')
+    this.load.atlas('effects', 'assets/atlas/effects.png', 'assets/atlas/effects.json')
     this.load.image('ore-patch', 'assets/effects/ore_patch.png')
-    this.load.image('fx-projectile', 'assets/effects/projectile.png')
-    this.load.image('fx-explosion', 'assets/effects/explosion.png')
-    this.load.image('fx-muzzle', 'assets/effects/muzzle.png')
-
-    for (const key of ALL_UNIT_KINDS) {
-      this.load.image(`unit-${key}`, `assets/units/${key}.png`)
-      this.load.spritesheet(`unit-${key}-sheet`, `assets/units/${key}_sheet.png`, { frameWidth: 256, frameHeight: 256 })
-    }
-
-    for (const key of ALL_BUILDING_KINDS) {
-      this.load.image(`building-${key}`, `assets/buildings/${key}.png`)
-      this.load.image(`building-alien-${key}`, `assets/buildings/alien_${key}.png`)
-      this.load.image(`building-veyra-${key}`, `assets/buildings/veyra_${key}.png`)
-    }
 
     this.load.image('wreck-infantry', 'assets/wrecks/infantry.png')
     this.load.image('wreck-vehicle', 'assets/wrecks/vehicle.png')
@@ -130,20 +160,21 @@ export class BattleScene extends Phaser.Scene {
     useGameStore.getState().setProductionQueues([])
     useGameStore.getState().setResearchQueues([])
     useGameStore.getState().setAttackMoveArmed(false)
+    useGameStore.getState().setControlGroups({})
     this.credits = definition.starting_credits
     this.cameras.main.setBounds(0, 0, definition.world_width, definition.world_height)
     this.cameras.main.centerOn(definition.player_spawn.x + 250, definition.player_spawn.y)
     this.input.mouse?.disableContextMenu()
 
+    this.setupLighting()
+    this.pathfinder = new Pathfinder()
     this.drawTerrain()
-    this.setupAnimations()
     this.combat = new CombatSystem(this)
     this.harvesting = new HarvestingSystem()
     this.support = new SupportSystem(this)
     this.production = new ProductionSystem()
     this.research = new ResearchSystem()
     this.avoidance = new LocalAvoidanceSystem()
-    this.pathfinder = new Pathfinder()
     this.fog = new FogOfWarSystem(this, definition.world_width, definition.world_height)
     this.spawnStartingWorld()
     this.fog.update(0, this.units, this.buildings, true)
@@ -158,9 +189,10 @@ export class BattleScene extends Phaser.Scene {
     this.configureInput()
     this.configureKeyboard()
     this.configureBridge()
-    this.createMinimap()
     this.syncStore(true)
-    useGameStore.getState().setStatus('playing', `${FACTION_DATA[this.playerFaction].name} command online. Destroy the ${buildingLabel('conyard', this.enemyFaction)} and eliminate hostile resistance.`)
+    this.emitMinimapSnapshot()
+    useGameStore.getState().setStatus('playing')
+    this.alert(`${FACTION_DATA[this.playerFaction].name} command online. Destroy the ${buildingLabel('conyard', this.enemyFaction)} and eliminate hostile resistance.`)
   }
 
   update(time: number, delta: number): void {
@@ -170,8 +202,10 @@ export class BattleScene extends Phaser.Scene {
     for (const building of this.buildings) building.updateShield(delta, time)
     this.avoidance.update(this.units)
     this.harvesting.update(delta, this.units, this.buildings, this.patches, (team, amount) => {
-      if (team === 'player') this.credits += amount
-      else this.enemyCredits += amount
+      if (team === 'player') {
+        this.credits += amount
+        this.incomeSamples.push({ at: time, amount })
+      } else this.enemyCredits += amount
     }, (team) => this.harvestMultiplier(team))
     this.production.update(delta, (team) => this.productionSpeedMultiplier(team), (completion) => this.completeProduction(completion.building, completion.kind, completion.team))
     this.research.update(delta, (team) => this.productionSpeedMultiplier(team), (upgrade, team) => this.completeResearch(upgrade, team))
@@ -188,19 +222,157 @@ export class BattleScene extends Phaser.Scene {
     this.resumeAttackMoves()
     this.enemyAI.update(time, this.units, this.buildings)
     this.units = this.units.filter((item) => item.alive)
+    const buildingsBefore = this.buildings.length
     this.buildings = this.buildings.filter((item) => item.alive)
+    if (this.buildings.length !== buildingsBefore) this.pathfinder.invalidate()
     this.selectedUnits = this.selectedUnits.filter((item) => item.alive)
     if (this.selectedBuilding && !this.selectedBuilding.alive) this.selectedBuilding = null
     this.checkEndState()
+    if (time >= this.nextMinimapEmitAt) {
+      this.nextMinimapEmitAt = time + MINIMAP_EMIT_INTERVAL_MS
+      this.emitMinimapSnapshot()
+    }
     if (time >= this.nextStoreSyncAt) {
       this.nextStoreSyncAt = time + 180
-      this.syncStore(false)
+      this.syncStore(false, time)
     }
+  }
+
+  /**
+   * Pushes the data the DOM minimap repaints from. This runs on its own, slower
+   * timer than the main store sync because it allocates one blip per visible
+   * entity, and the minimap stays perfectly readable updating far below the
+   * simulation's frame rate.
+   */
+  private emitMinimapSnapshot(): void {
+    const { world_width: worldWidth, world_height: worldHeight } = this.mission.definition
+    const view = this.cameras.main.worldView
+    const blips: MinimapBlip[] = []
+
+    for (const patch of this.patches) {
+      if (patch.amount <= 0) continue
+      blips.push({ x: patch.x, y: patch.y, team: 'neutral', structure: false })
+    }
+    // Enemies are only plotted where the player currently has vision, so the
+    // minimap can't be used to scout through the fog of war.
+    for (const building of this.buildings) {
+      if (building.team !== 'player' && !this.fog.isVisible(building.x, building.y)) continue
+      blips.push({ x: building.x, y: building.y, team: building.team, structure: true })
+    }
+    for (const unit of this.units) {
+      if (unit.team !== 'player' && !this.fog.isVisible(unit.x, unit.y)) continue
+      blips.push({ x: unit.x, y: unit.y, team: unit.team, structure: false })
+    }
+
+    gameBus.emit('minimap-snapshot', {
+      worldWidth,
+      worldHeight,
+      blips,
+      view: { x: view.x, y: view.y, width: view.width, height: view.height },
+    })
+  }
+
+  /**
+   * Credits per minute, derived from the rolling deposit window. Early in a
+   * match the window is divided by the elapsed time rather than its full length,
+   * so the figure ramps up honestly instead of reading as a fraction of the
+   * true rate for the first stretch of the game.
+   */
+  private currentIncome(now: number): number {
+    const cutoff = now - INCOME_WINDOW_MS
+    this.incomeSamples = this.incomeSamples.filter((sample) => sample.at >= cutoff)
+    if (this.incomeSamples.length === 0) return 0
+    const total = this.incomeSamples.reduce((sum, sample) => sum + sample.amount, 0)
+    const elapsed = Math.min(now, INCOME_WINDOW_MS)
+    return elapsed <= 0 ? 0 : Math.round((total * 60000) / elapsed)
+  }
+
+  /** Queues a notification in the HUD alert log. */
+  private alert(message: string, severity: AlertSeverity = 'info', at?: { x: number; y: number }): void {
+    useGameStore.getState().pushAlert({ message, severity, ...(at ? { at_world: at } : {}) })
+  }
+
+  /**
+   * Enables Phaser's lighting pipeline and builds a two-light rig that matches
+   * the lighting already baked into the art (see art/style.md and the shared
+   * prompt preamble): a warm key from the upper-left at a shallow angle, plus
+   * a weak cool blue-grey fill from the lower-right.
+   *
+   * Phaser has no directional/sun light, only point lights, so the key is
+   * faked by placing a point light far off-map in the key direction with a
+   * radius large enough to cover the world. Working through the shader
+   * (DefineLights.glsl) the attenuation term reduces to
+   * `1 - (D^2 + z^2) / radius^2`, where D is the horizontal world distance to
+   * the fragment and z is the light's height — camera zoom cancels out
+   * entirely. Pushing the light out to several map-widths therefore keeps both
+   * the incoming direction and the brightness nearly constant across the whole
+   * map (roughly 30-41 degrees of elevation corner to corner, and 0.72-0.84
+   * attenuation), which is what makes it read as a sun rather than a lamp.
+   *
+   * The previous rig was a single light parked at the centre of the map, which
+   * is why lighting looked wrong: at the centre it shone straight down while at
+   * the edges it grazed almost horizontally, so identical units were shaded
+   * completely differently depending on where they stood, and none of it agreed
+   * with the highlights already painted into the sprites.
+   */
+  private setupLighting(): void {
+    this.lights.enable()
+    this.lights.setAmbientColor(AMBIENT_COLOR)
+
+    const { world_width: width, world_height: height } = this.mission.definition
+    const halfDiagonal = Math.hypot(width, height) / 2
+    // Horizontal distance the key/fill are pushed outside the map. Larger is
+    // more parallel (more sun-like) but needs a proportionally larger radius.
+    const spread = Math.max(width, height) * LIGHT_SPREAD_FACTOR
+
+    const addDirectionalLight = (screenAngleDeg: number, color: number, intensity: number) => {
+      const angle = Phaser.Math.DegToRad(screenAngleDeg)
+      const z = spread * Math.tan(Phaser.Math.DegToRad(LIGHT_ELEVATION_DEG))
+      // Radius must clear the furthest fragment or that corner falls to black;
+      // the extra headroom factor sets how gentle the falloff is across the map.
+      const radius = Math.hypot(spread + halfDiagonal, z) * LIGHT_RADIUS_HEADROOM
+      return this.lights
+        .addLight(width / 2 + Math.cos(angle) * spread, height / 2 + Math.sin(angle) * spread, radius, color, intensity)
+        .setZ(z)
+    }
+
+    addDirectionalLight(KEY_LIGHT_ANGLE_DEG, KEY_LIGHT_COLOR, KEY_LIGHT_INTENSITY)
+    addDirectionalLight(KEY_LIGHT_ANGLE_DEG + 180, FILL_LIGHT_COLOR, FILL_LIGHT_INTENSITY)
+
+    const bindNormalMap = (colorKey: string, normalKey: string) => {
+      if (!this.textures.exists(colorKey) || !this.textures.exists(normalKey)) return
+      const normalSource = this.textures.get(normalKey).source[0]
+      if (!normalSource) return
+      this.textures.get(colorKey).setDataSource(normalSource.source)
+    }
+    bindNormalMap('units', 'units-normal')
+    bindNormalMap('buildings', 'buildings-normal')
   }
 
   private drawTerrain(): void {
     const { world_width: width, world_height: height } = this.mission.definition
-    this.add.tileSprite(width / 2, height / 2, width, height, 'terrain-ground').setDepth(0)
+    this.add.tileSprite(width / 2, height / 2, width, height, 'terrain', 'ground_base').setLighting(true).setDepth(0)
+
+    const avoidZones = [
+      { x: this.mission.definition.player_spawn.x, y: this.mission.definition.player_spawn.y, radius: 300 },
+      { x: this.mission.definition.enemy_spawn.x, y: this.mission.definition.enemy_spawn.y, radius: 300 },
+      ...this.mission.definition.ore_fields.map((point) => ({ x: point.x, y: point.y, radius: 130 })),
+    ]
+    const features = generateTerrainFeatures(this.mission.id, width, height, avoidZones)
+    this.pathfinder.setTerrainObstacles(features.obstacles, width, height)
+    for (const decoration of features.decorations) {
+      const baseSize = decoration.frame.startsWith('ground_') ? 512 : decoration.blocking ? 512 : 256
+      this.add.image(decoration.x, decoration.y, 'terrain', decoration.frame)
+        .setDisplaySize(baseSize * decoration.scale, baseSize * decoration.scale)
+        .setAlpha(decoration.alpha)
+        // Terrain has no authored normal map, so this picks up flat diffuse
+        // only — but that still keys rocks, cliffs and doodads to the same
+        // ambient + key/fill rig as the ground and the units standing on them,
+        // instead of leaving them at full unlit brightness against a lit scene.
+        .setLighting(true)
+        .setDepth(decoration.frame.startsWith('ground_') ? 0.5 : decoration.blocking ? 4 : 3.5)
+    }
+
     const grime = this.add.graphics().setDepth(1)
     for (let index = 0; index < 36; index += 1) {
       const x = 90 + ((index * 317) % (width - 180))
@@ -243,6 +415,11 @@ export class BattleScene extends Phaser.Scene {
 
     this.spawnBuilding('conyard', 'enemy', enemy.x, enemy.y)
     this.spawnBuilding('power', 'enemy', enemy.x + 160, enemy.y - 140)
+    // A second supply structure: the largest authored enemy army (10 units,
+    // scaled 1.5x on Brutal) would otherwise spawn over the cap set by a single
+    // provider. It is also a legitimate target — destroying both supply-blocks
+    // the AI until it rebuilds.
+    this.spawnBuilding('power', 'enemy', enemy.x + 235, enemy.y - 55)
     this.spawnBuilding('refinery', 'enemy', enemy.x + 20, enemy.y - 175)
     this.spawnBuilding('warfactory', 'enemy', enemy.x - 165, enemy.y + 145)
     this.spawnBuilding('barracks', 'enemy', enemy.x + 150, enemy.y + 145)
@@ -282,7 +459,6 @@ export class BattleScene extends Phaser.Scene {
 
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       this.startAudio()
-      if (pointer.button === 0 && this.handleMinimapClick(pointer.x, pointer.y)) return
       const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
       if (pointer.button === 2) {
         if (this.placementKind) {
@@ -334,12 +510,7 @@ export class BattleScene extends Phaser.Scene {
     if (!this.input.keyboard) return
     this.cursors = this.input.keyboard.createCursorKeys()
     this.keys = {
-      W: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
-      A: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
-      S: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
-      D: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
       ESC: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC),
-      SHIFT: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT),
     }
     this.keys.ESC?.on('down', () => {
       this.cancelPlacement()
@@ -347,11 +518,6 @@ export class BattleScene extends Phaser.Scene {
       useGameStore.getState().setAttackMoveArmed(false)
     })
     this.input.keyboard.on('keydown', (event: KeyboardEvent) => {
-      if (event.shiftKey && event.code === 'KeyA') {
-        event.preventDefault()
-        this.armAttackMove()
-        return
-      }
       if (!/^Digit[1-9]$/.test(event.code)) return
       const group = Number(event.code.replace('Digit', ''))
       if (event.ctrlKey || event.metaKey) {
@@ -376,10 +542,57 @@ export class BattleScene extends Phaser.Scene {
     this.unsubscribers.push(gameBus.on('center-selected', () => this.centerSelected()))
     this.unsubscribers.push(gameBus.on('arm-attack-move', () => this.armAttackMove()))
     this.unsubscribers.push(gameBus.on('activate-ability', (ability) => this.activateAbility(ability)))
+    this.unsubscribers.push(gameBus.on('recall-control-group', (group) => this.recallControlGroup(group)))
+    this.unsubscribers.push(gameBus.on('minimap-command', (point) => this.handleMinimapCommand(point)))
+    this.unsubscribers.push(gameBus.on('jump-to-world', (point) => this.cameras.main.centerOn(point.x, point.y)))
+    this.unsubscribers.push(gameBus.on('selection-isolate', (id) => this.isolateSelection(id)))
+    this.unsubscribers.push(gameBus.on('selection-remove', (id) => this.removeFromSelection(id)))
 
     const dispose = () => this.disposeBridge()
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, dispose)
     this.events.once(Phaser.Scenes.Events.DESTROY, dispose)
+  }
+
+  /**
+   * Handles a click on the DOM minimap. `move` recentres the camera; `command`
+   * issues the same order a right-click on the battlefield would, letting the
+   * player redirect forces across the map without scrolling there first.
+   */
+  private handleMinimapCommand({ u, v, action }: { u: number; v: number; action: 'move' | 'command' }): void {
+    const { world_width: width, world_height: height } = this.mission.definition
+    const x = Phaser.Math.Clamp(u, 0, 1) * width
+    const y = Phaser.Math.Clamp(v, 0, 1) * height
+    if (action === 'move') this.cameras.main.centerOn(x, y)
+    else this.issueCommand(x, y)
+  }
+
+  /** Narrows the selection down to the one entity clicked in the selection strip. */
+  private isolateSelection(id: string): void {
+    const unit = this.units.find((item) => item.alive && item.id === id)
+    const building = unit ? undefined : this.buildings.find((item) => item.alive && item.id === id)
+    if (!unit && !building) return
+    this.clearSelection()
+    if (unit) {
+      unit.setSelected(true)
+      this.selectedUnits = [unit]
+    } else if (building) {
+      building.setSelected(true)
+      this.selectedBuilding = building
+    }
+    this.syncSelection()
+  }
+
+  /** Drops one entity from the selection, for shift-clicking it out of the selection strip. */
+  private removeFromSelection(id: string): void {
+    const unit = this.selectedUnits.find((item) => item.id === id)
+    if (unit) {
+      unit.setSelected(false)
+      this.selectedUnits = this.selectedUnits.filter((item) => item !== unit)
+    } else if (this.selectedBuilding?.id === id) {
+      this.selectedBuilding.setSelected(false)
+      this.selectedBuilding = null
+    } else return
+    this.syncSelection()
   }
 
   private disposeBridge(): void {
@@ -411,16 +624,22 @@ export class BattleScene extends Phaser.Scene {
     this.tryPlaceBuilding(world.x, world.y)
   }
 
+  /**
+   * Scrolls the camera from the arrow keys, screen-edge pointer position and
+   * (via the bus) the minimap. Letter keys deliberately do not pan: the command
+   * card binds them to orders the way StarCraft does, and a WASD pan would make
+   * `A` for attack-move and `S` for stop unusable.
+   */
   private panCamera(delta: number): void {
     const camera = this.cameras.main
     const speed = 620 * (delta / 1000) / camera.zoom
     let x = 0
     let y = 0
 
-    if (this.cursors?.left.isDown || (this.keys.A?.isDown && !this.keys.SHIFT?.isDown)) x -= 1
-    if (this.cursors?.right.isDown || this.keys.D?.isDown) x += 1
-    if (this.cursors?.up.isDown || this.keys.W?.isDown) y -= 1
-    if (this.cursors?.down.isDown || this.keys.S?.isDown) y += 1
+    if (this.cursors?.left.isDown) x -= 1
+    if (this.cursors?.right.isDown) x += 1
+    if (this.cursors?.up.isDown) y -= 1
+    if (this.cursors?.down.isDown) y += 1
 
     if (this.pointerInsideGame) {
       x += this.edgePanX
@@ -438,27 +657,8 @@ export class BattleScene extends Phaser.Scene {
     const height = this.scale.height
     const margin = this.edgePanMargin
 
-    // Don't edge-scroll while interacting with the fixed-position minimap.
-    if (this.minimapRect.contains(pointer.x, pointer.y)) {
-      this.edgePanX = 0
-      this.edgePanY = 0
-      return
-    }
-
     this.edgePanX = pointer.x <= margin ? -1 : pointer.x >= width - margin ? 1 : 0
     this.edgePanY = pointer.y <= margin ? -1 : pointer.y >= height - margin ? 1 : 0
-  }
-
-  private handleMinimapClick(screenX: number, screenY: number): boolean {
-    if (!this.minimapRect.contains(screenX, screenY)) return false
-    const u = Phaser.Math.Clamp((screenX - this.minimapRect.x) / this.minimapRect.width, 0, 1)
-    const v = Phaser.Math.Clamp((screenY - this.minimapRect.y) / this.minimapRect.height, 0, 1)
-    const worldX = u * this.mission.definition.world_width
-    const worldY = v * this.mission.definition.world_height
-    this.cameras.main.centerOn(worldX, worldY)
-    this.edgePanX = 0
-    this.edgePanY = 0
-    return true
   }
 
   private selectAt(x: number, y: number, additive: boolean): void {
@@ -507,7 +707,7 @@ export class BattleScene extends Phaser.Scene {
   private issueCommand(x: number, y: number): void {
     if (this.selectedBuilding && ['barracks', 'warfactory', 'airfield'].includes(this.selectedBuilding.kind)) {
       this.selectedBuilding.setRallyPoint(x, y)
-      useGameStore.getState().setStatus('playing', `${buildingLabel(this.selectedBuilding.kind, this.playerFaction)} rally point set.`)
+      this.alert(`${buildingLabel(this.selectedBuilding.kind, this.playerFaction)} rally point set.`)
       return
     }
     if (this.selectedUnits.length === 0) return
@@ -534,7 +734,7 @@ export class BattleScene extends Phaser.Scene {
     if (attackMove) {
       this.attackMoveArmed = false
       useGameStore.getState().setAttackMoveArmed(false)
-      useGameStore.getState().setStatus('playing', 'Attack-move order issued.')
+      this.alert('Attack-move order issued.')
     }
   }
 
@@ -560,11 +760,11 @@ export class BattleScene extends Phaser.Scene {
     const stats = BUILDING_STATS[kind]
     const displayLabel = buildingLabel(kind, this.playerFaction)
     if (this.credits < stats.cost) {
-      useGameStore.getState().setStatus('playing', `Need $${stats.cost.toLocaleString()} for ${displayLabel}.`)
+      this.alert(`Need $${stats.cost.toLocaleString()} for ${displayLabel}.`, 'warning')
       return
     }
     if (!this.meetsBuildingPrerequisite(kind)) {
-      useGameStore.getState().setStatus('playing', `Prerequisite missing for ${displayLabel}.`)
+      this.alert(`Prerequisite missing for ${displayLabel}.`, 'warning')
       return
     }
     this.cancelPlacement()
@@ -572,13 +772,13 @@ export class BattleScene extends Phaser.Scene {
     useGameStore.getState().setPlacementKind(kind)
     const world = this.cameras.main.getWorldPoint(this.scale.width / 2, this.scale.height / 2)
     this.placementGhost = this.add
-      .image(world.x, world.y, BUILDING_TEXTURES[this.playerFaction][kind])
+      .image(world.x, world.y, 'buildings', buildingAtlasFrame(kind, this.playerFaction))
       .setDisplaySize(stats.spriteSize.width, stats.spriteSize.height)
       .setTint(0x8dffc8)
       .setAlpha(0.42)
       .setDepth(9000)
     this.updatePlacementGhost(world.x, world.y)
-    useGameStore.getState().setStatus('playing', `PLACEMENT MODE: ${displayLabel}. Move onto the battlefield and left-click to place; Esc/right-click cancels.`)
+    this.alert(`PLACEMENT MODE: ${displayLabel}. Move onto the battlefield and left-click to place; Esc/right-click cancels.`)
   }
 
   private meetsBuildingPrerequisite(kind: BuildingKind): boolean {
@@ -622,7 +822,7 @@ export class BattleScene extends Phaser.Scene {
     if (!kind) return
     const stats = BUILDING_STATS[kind]
     if (!this.isValidBuildingPlacement(kind, x, y)) {
-      useGameStore.getState().setStatus('playing', 'Invalid build location — red ghost means blocked, out of bounds, or too far from your base.')
+      this.alert('Invalid build location — red ghost means blocked, out of bounds, or too far from your base.', 'warning')
       this.updatePlacementGhost(x, y)
       return
     }
@@ -631,7 +831,7 @@ export class BattleScene extends Phaser.Scene {
     this.sound.play('sfx-confirm', { volume: 0.22 })
     this.cancelPlacement()
     this.syncStore(true)
-    useGameStore.getState().setStatus('playing', `${buildingLabel(kind, this.playerFaction)} deployed.`)
+    this.alert(`${buildingLabel(kind, this.playerFaction)} deployed.`)
   }
 
   private cancelPlacement(): void {
@@ -648,34 +848,35 @@ export class BattleScene extends Phaser.Scene {
     const stats = UNIT_STATS[kind]
     const allowed = [...FACTION_DATA[this.playerFaction].infantry, ...FACTION_DATA[this.playerFaction].factory, ...FACTION_DATA[this.playerFaction].air]
     if (!allowed.includes(kind)) {
-      useGameStore.getState().setStatus('playing', `${stats.label} does not belong to ${FACTION_DATA[this.playerFaction].name}.`)
+      this.alert(`${stats.label} does not belong to ${FACTION_DATA[this.playerFaction].name}.`, 'warning')
       return
     }
     if (!isUnitUnlocked(kind, this.completedUpgrades)) {
-      useGameStore.getState().setStatus('playing', `${stats.label} is locked behind your faction tech tree.`)
+      this.alert(`${stats.label} is locked behind your faction tech tree.`, 'warning')
       return
     }
     const factoryKind: BuildingKind = stats.requiredFactory
     const factories = this.buildings.filter((building) => building.alive && building.team === 'player' && building.kind === factoryKind)
     if (factories.length === 0) {
-      useGameStore.getState().setStatus('playing', `${buildingLabel(factoryKind, this.playerFaction)} required.`)
+      this.alert(`${buildingLabel(factoryKind, this.playerFaction)} required.`, 'warning')
       return
     }
     const factory = [...factories].sort((a, b) => this.production.queueLength(a.id) - this.production.queueLength(b.id))[0]
     if (!factory) return
     if (this.credits < stats.cost) {
-      useGameStore.getState().setStatus('playing', `Need $${stats.cost.toLocaleString()} for ${stats.label}.`)
+      this.alert(`Need $${stats.cost.toLocaleString()} for ${stats.label}.`, 'warning')
       return
     }
-    const economy = this.calculatePower()
-    if (economy.used > economy.capacity) {
-      useGameStore.getState().setStatus('playing', 'Low power: unit production is offline.')
+    const supply = this.calculateSupply()
+    if (supply.used + stats.supply > supply.capacity) {
+      const provider = buildingLabel('power', this.playerFaction)
+      this.alert(`Supply capped at ${supply.capacity}. Build a ${provider} to train ${stats.label}.`, 'warning')
       return
     }
     this.credits -= stats.cost
     this.production.enqueue(factory, this.playerFaction, kind)
     this.sound.play('sfx-confirm', { volume: 0.16 })
-    useGameStore.getState().setStatus('playing', `${stats.label} added to ${buildingLabel(factory.kind, this.playerFaction)} queue.`)
+    this.alert(`${stats.label} added to ${buildingLabel(factory.kind, this.playerFaction)} queue.`)
     this.syncStore(true)
   }
 
@@ -684,7 +885,7 @@ export class BattleScene extends Phaser.Scene {
     if (!kind) return
     const refund = Math.round(UNIT_STATS[kind].cost * 0.75)
     this.credits += refund
-    useGameStore.getState().setStatus('playing', `${UNIT_STATS[kind].label} cancelled. $${refund.toLocaleString()} refunded.`)
+    this.alert(`${UNIT_STATS[kind].label} cancelled. $${refund.toLocaleString()} refunded.`)
     this.syncStore(true)
   }
 
@@ -692,27 +893,24 @@ export class BattleScene extends Phaser.Scene {
     const def = UPGRADE_DEFS[upgradeKey]
     if (def.faction !== this.playerFaction || this.completedUpgrades.has(upgradeKey) || this.research.isQueued(upgradeKey)) return
     if (!def.prerequisites.every((item) => this.completedUpgrades.has(item))) {
-      useGameStore.getState().setStatus('playing', `Prerequisites not met for ${def.label}.`)
+      this.alert(`Prerequisites not met for ${def.label}.`, 'warning')
       return
     }
     const building = this.buildings.find((candidate) => candidate.alive && candidate.team === 'player' && candidate.kind === def.requiredBuilding)
     if (!building) {
-      useGameStore.getState().setStatus('playing', `${buildingLabel(def.requiredBuilding, this.playerFaction)} required for ${def.label}.`)
+      this.alert(`${buildingLabel(def.requiredBuilding, this.playerFaction)} required for ${def.label}.`, 'warning')
       return
     }
     if (this.credits < def.cost) {
-      useGameStore.getState().setStatus('playing', `Need $${def.cost.toLocaleString()} to research ${def.label}.`)
+      this.alert(`Need $${def.cost.toLocaleString()} to research ${def.label}.`, 'warning')
       return
     }
-    const power = this.calculatePower()
-    if (power.used > power.capacity) {
-      useGameStore.getState().setStatus('playing', 'Low power: research systems are offline.')
-      return
-    }
+    // Deliberately not supply-gated: supply constrains army size, and research
+    // adds no units. Credits and the required structure are the only costs.
     this.credits -= def.cost
     this.research.enqueue(building, this.playerFaction, upgradeKey)
     this.sound.play('sfx-confirm', { volume: 0.16 })
-    useGameStore.getState().setStatus('playing', `${def.label} research queued.`)
+    this.alert(`${def.label} research queued.`)
     this.syncStore(true)
   }
 
@@ -724,7 +922,7 @@ export class BattleScene extends Phaser.Scene {
       const path = this.pathfinder.findPath(unit, goal, this.buildings, this.mission.definition.world_width, this.mission.definition.world_height)
       unit.setPath(path.map((point) => new Phaser.Math.Vector2(point.x, point.y)))
     }
-    if (team === 'player') useGameStore.getState().setStatus('playing', `${UNIT_STATS[kind].label} ready.`)
+    if (team === 'player') this.alert(`${UNIT_STATS[kind].label} ready.`)
   }
 
   private completeResearch(upgradeKey: UpgradeKey, team: 'player' | 'enemy'): void {
@@ -733,7 +931,7 @@ export class BattleScene extends Phaser.Scene {
     this.applyUpgradeEffects(team)
     if (team === 'player') {
       useGameStore.getState().setCompletedUpgrades([...this.completedUpgrades])
-      useGameStore.getState().setStatus('playing', `${UPGRADE_DEFS[upgradeKey].label} research complete.`)
+      this.alert(`${UPGRADE_DEFS[upgradeKey].label} research complete.`)
     }
   }
 
@@ -742,8 +940,8 @@ export class BattleScene extends Phaser.Scene {
     if (!allowed.includes(kind)) return false
     const stats = UNIT_STATS[kind]
     const factories = this.buildings.filter((building) => building.alive && building.team === 'enemy' && building.kind === stats.requiredFactory)
-    const enemyPower = this.calculatePowerForTeam('enemy')
-    if (enemyPower.used > enemyPower.capacity) {
+    const enemySupply = this.calculateSupplyForTeam('enemy')
+    if (enemySupply.used + stats.supply > enemySupply.capacity) {
       this.tryEnemyBuild('power')
       return false
     }
@@ -788,6 +986,9 @@ export class BattleScene extends Phaser.Scene {
     const faction = team === 'player' ? this.playerFaction : this.enemyFaction
     const building = new Building(this, id, kind, team, faction, x, y)
     this.buildings.push(building)
+    // The pathfinder caches its obstacle grid, so any layout change must be
+    // announced explicitly rather than relying on change detection alone.
+    this.pathfinder.invalidate()
     if (team === 'enemy' && this.fog) building.setFogVisible(this.fog.isVisible(x, y))
     return building
   }
@@ -798,16 +999,6 @@ export class BattleScene extends Phaser.Scene {
     }
     for (const building of this.buildings) {
       if (building.team === 'enemy') building.setFogVisible(building.alive && this.fog.isVisible(building.x, building.y))
-    }
-  }
-
-  private setupAnimations(): void {
-    for (const kind of ALL_UNIT_KINDS) {
-      const key = `${kind}-move`
-      if (this.anims.exists(key)) continue
-      const role = UNIT_STATS[kind].role
-      const rate = role === 'air' ? 9 : role === 'infantry' || role === 'support' ? 9 : role === 'vehicle' ? 7 : 7
-      this.anims.create({ key, frames: this.anims.generateFrameNumbers(`unit-${kind}-sheet`, { start: 0, end: 3 }), frameRate: rate, repeat: -1 })
     }
   }
 
@@ -879,12 +1070,13 @@ export class BattleScene extends Phaser.Scene {
       ? [this.selectedBuilding.id]
       : this.selectedUnits.map((unit) => unit.id)
     if (ids.length === 0) return
-    this.controlGroups.set(group, ids)
+    this.controlGroups.assign(group, ids)
     useGameStore.getState().setStatus('playing', `Control group ${group} assigned (${ids.length}).`)
+    this.syncControlGroupSizes()
   }
 
   private recallControlGroup(group: number): void {
-    const ids = this.controlGroups.get(group)
+    const ids = this.controlGroups.idsFor(group)
     if (!ids || ids.length === 0) return
     this.clearSelection()
     const unitMatches = this.units.filter((unit) => unit.alive && unit.team === 'player' && ids.includes(unit.id))
@@ -897,10 +1089,14 @@ export class BattleScene extends Phaser.Scene {
       this.selectedUnits.forEach((unit) => unit.setSelected(true))
     }
     this.syncSelection()
-    const now = this.time.now
-    const previous = this.lastGroupRecallAt.get(group) ?? -1000
-    this.lastGroupRecallAt.set(group, now)
-    if (now - previous < 450) this.centerSelected()
+    const isDoubleTap = this.controlGroups.recordRecall(group, this.time.now)
+    if (isDoubleTap) this.centerSelected()
+  }
+
+  private syncControlGroupSizes(): void {
+    const isAlive = (id: string) =>
+      this.units.some((unit) => unit.id === id && unit.alive) || this.buildings.some((building) => building.id === id && building.alive)
+    useGameStore.getState().setControlGroups(this.controlGroups.sizes(isAlive))
   }
 
   private resumeAttackMoves(): void {
@@ -975,29 +1171,44 @@ export class BattleScene extends Phaser.Scene {
     unit.applyUpgradeModifiers({ speed, damage, cooldown, visionBonus, rangeBonus, damageReduction, shieldRegen })
   }
 
-  private calculatePowerForTeam(team: 'player' | 'enemy'): { used: number; capacity: number } {
+  /**
+   * Supply committed against the cap for a team.
+   *
+   * "Used" counts living units *plus* everything queued or in production, so a
+   * player cannot dodge the cap by filling every factory queue in the same
+   * instant that the last slot frees up. "Capacity" is the sum of supply from
+   * living structures, clamped to `MAX_SUPPLY`.
+   */
+  private calculateSupplyForTeam(team: 'player' | 'enemy'): { used: number; capacity: number } {
     let used = 0
-    let capacity = 0
-    for (const building of this.buildings.filter((item) => item.alive && item.team === team)) {
-      const power = BUILDING_STATS[building.kind].power
-      if (power < 0) capacity += Math.abs(power)
-      else used += power
+    for (const unit of this.units) {
+      if (unit.alive && unit.team === team) used += UNIT_STATS[unit.kind].supply
     }
-    return { used, capacity }
+    used += this.production?.queuedSupply(team) ?? 0
+
+    let capacity = 0
+    for (const building of this.buildings) {
+      if (building.alive && building.team === team) capacity += BUILDING_STATS[building.kind].supply
+    }
+    return { used, capacity: Math.min(MAX_SUPPLY, capacity) }
   }
 
-  private calculatePower(): { used: number; capacity: number } {
-    return this.calculatePowerForTeam('player')
+  private calculateSupply(): { used: number; capacity: number } {
+    return this.calculateSupplyForTeam('player')
   }
 
-  private syncStore(forceSelection: boolean): void {
-    const power = this.calculatePower()
+  private syncStore(forceSelection: boolean, now = this.time.now): void {
+    const supply = this.calculateSupply()
     const store = useGameStore.getState()
-    store.setEconomy(Math.round(this.credits), power.used, power.capacity)
+    store.setEconomy(Math.round(this.credits), supply.used, supply.capacity, this.currentIncome(now))
     store.setProductionQueues(this.production?.getPlayerViews() ?? [])
     store.setResearchQueues(this.research?.getPlayerViews() ?? [])
     store.setCompletedUpgrades([...this.completedUpgrades])
     store.setAttackMoveArmed(this.attackMoveArmed)
+    store.setOwnedBuildingKinds([
+      ...new Set(this.buildings.filter((item) => item.alive && item.team === 'player').map((item) => item.kind)),
+    ])
+    this.syncControlGroupSizes()
     if (forceSelection || this.selectedUnits.length > 0 || this.selectedBuilding) this.syncSelection()
   }
 
@@ -1011,19 +1222,5 @@ export class BattleScene extends Phaser.Scene {
       this.clearSelection()
       useGameStore.getState().setStatus('defeat', `Your ${buildingLabel('conyard', this.playerFaction)} was destroyed.`)
     }
-  }
-
-  private createMinimap(): void {
-    const width = 188
-    const height = 110
-    const mini = this.cameras.add(16, 16, width, height, false, 'minimap')
-    mini.setBounds(0, 0, this.mission.definition.world_width, this.mission.definition.world_height)
-    mini.centerOn(this.mission.definition.world_width / 2, this.mission.definition.world_height / 2)
-    mini.setZoom(Math.min(width / this.mission.definition.world_width, height / this.mission.definition.world_height))
-    const border = this.add.rectangle(16 + width / 2, 16 + height / 2, width + 6, height + 6, 0x0b0e0c, 0.2)
-      .setStrokeStyle(2, 0xb8c5ba)
-      .setScrollFactor(0)
-      .setDepth(9999)
-    mini.ignore(border)
   }
 }

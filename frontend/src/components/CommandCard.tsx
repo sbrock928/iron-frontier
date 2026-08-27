@@ -1,0 +1,345 @@
+import { useEffect, useMemo, useState } from 'react'
+import {
+  ABILITY_DEFS,
+  ALL_BUILDING_KINDS,
+  BUILDING_STATS,
+  FACTION_DATA,
+  UI_ICONS,
+  UNIT_STATS,
+  UPGRADE_DEFS,
+  WORKER_KINDS,
+  buildingLabel,
+  factionBuildingIcon,
+  isUnitUnlocked,
+} from '../game/config'
+import { gameBus } from '../game/events/gameBus'
+import { COMMAND_GRID_COLUMNS, COMMAND_GRID_ROWS, COMMAND_GRID_SIZE, ORDER_HOTKEYS, assignHotkeys, padToGrid } from '../game/hotkeys'
+import { useGameStore } from '../store/gameStore'
+import type { BuildingKind, CommandAction, UnitKind, UpgradeKey } from '../types'
+
+/** Which submenu the card is currently showing. */
+type CardPage = 'root' | 'build' | 'research'
+
+/** Structures the player can order; the conyard is the thing that builds them. */
+const STRUCTURES: BuildingKind[] = ALL_BUILDING_KINDS.filter((kind) => kind !== 'conyard')
+
+/** Purpose-made icons for orders that aren't a unit or structure. */
+const ORDER_ICONS = {
+  attack: '/assets/ui/cmd_attack.png',
+  stop: '/assets/ui/cmd_stop.png',
+  center: '/assets/ui/cmd_center.png',
+} as const
+
+function CommandButton({ action, onInvoke }: { action: CommandAction | null; onInvoke: (action: CommandAction) => void }) {
+  if (!action) return <div className="command-slot command-slot-empty" aria-hidden="true" />
+
+  const title = [action.label, action.cost ? `$${action.cost.toLocaleString()}` : '', action.reason ?? '']
+    .filter(Boolean)
+    .join(' — ')
+
+  return (
+    <button
+      className={`command-slot ${action.disabled ? 'is-disabled' : ''}`.trim()}
+      disabled={action.disabled}
+      title={title}
+      onClick={() => onInvoke(action)}
+    >
+      <img src={action.icon} alt="" aria-hidden="true" />
+      <span className="command-hotkey">{action.hotkey}</span>
+      <span className="command-label">{action.label}</span>
+      {action.cost ? <span className="command-cost">${action.cost.toLocaleString()}</span> : null}
+    </button>
+  )
+}
+
+/**
+ * The command card: a fixed 3x4 grid of context-sensitive orders on the right
+ * of the console, with keyboard hotkeys.
+ *
+ * The grid is always rendered at full size and unavailable actions are shown
+ * disabled rather than hidden, so a given order stays in the same place from one
+ * selection to the next. That positional stability is the entire point of an
+ * RTS command card — it is what lets a player issue orders without looking.
+ */
+export function CommandCard() {
+  const selected = useGameStore((state) => state.selected)
+  const faction = useGameStore((state) => state.faction)
+  const credits = useGameStore((state) => state.credits)
+  const completedUpgrades = useGameStore((state) => state.completedUpgrades)
+  const placementKind = useGameStore((state) => state.placementKind)
+  const attackMoveArmed = useGameStore((state) => state.attackMoveArmed)
+  const productionQueues = useGameStore((state) => state.productionQueues)
+  const ownedBuildingKinds = useGameStore((state) => state.ownedBuildingKinds)
+
+  const [page, setPage] = useState<CardPage>('root')
+
+  // Any change of selection returns the card to its root page: leaving it on a
+  // submenu belonging to a structure the player no longer has selected would
+  // show orders that cannot be issued.
+  const selectionSignature = selected.map((entity) => entity.id).join(',')
+  useEffect(() => setPage('root'), [selectionSignature])
+
+  const completed = useMemo(() => new Set<UpgradeKey>(completedUpgrades), [completedUpgrades])
+  const owned = useMemo(() => new Set<BuildingKind>(ownedBuildingKinds), [ownedBuildingKinds])
+  const primary = selected[0] ?? null
+  const selectedKinds = useMemo(() => new Set(selected.map((entity) => entity.kind)), [selected])
+
+  const actions = useMemo<CommandAction[]>(() => {
+    const data = FACTION_DATA[faction]
+
+    const backAction: CommandAction = {
+      id: 'back', label: 'Back', hotkey: ORDER_HOTKEYS.back, icon: ORDER_ICONS.center, kind: 'back', key: 'back',
+    }
+
+    if (page === 'build') {
+      const hotkeys = assignHotkeys(STRUCTURES, (kind) => buildingLabel(kind, faction))
+      return [
+        ...STRUCTURES.map<CommandAction>((kind) => {
+          const stats = BUILDING_STATS[kind]
+          const affordable = credits >= stats.cost
+          return {
+            id: `build-${kind}`,
+            label: buildingLabel(kind, faction),
+            hotkey: hotkeys.get(kind) ?? '',
+            icon: factionBuildingIcon(kind, faction),
+            kind: 'build',
+            key: kind,
+            cost: stats.cost,
+            disabled: !affordable,
+            ...(affordable ? {} : { reason: 'Insufficient credits' }),
+          }
+        }),
+        backAction,
+      ]
+    }
+
+    if (page === 'research') {
+      const available = Object.values(UPGRADE_DEFS)
+        .filter((definition) => definition.faction === faction && !completed.has(definition.key))
+        .sort((a, b) => a.tier - b.tier || a.label.localeCompare(b.label))
+        .slice(0, COMMAND_GRID_SIZE - 1)
+      const hotkeys = assignHotkeys(available, (definition) => definition.label)
+      return [
+        ...available.map<CommandAction>((definition) => {
+          const prerequisitesMet = definition.prerequisites.every((key) => completed.has(key))
+          const affordable = credits >= definition.cost
+          const hasBuilding = owned.has(definition.requiredBuilding)
+          const reason = !hasBuilding
+            ? `Requires ${buildingLabel(definition.requiredBuilding, faction)}`
+            : !prerequisitesMet
+              ? 'Prerequisites not met'
+              : !affordable
+                ? 'Insufficient credits'
+                : null
+          return {
+            id: `research-${definition.key}`,
+            label: definition.label,
+            hotkey: hotkeys.get(definition) ?? '',
+            icon: UI_ICONS.techlab,
+            kind: 'research',
+            key: definition.key,
+            cost: definition.cost,
+            disabled: reason !== null,
+            ...(reason ? { reason } : {}),
+          }
+        }),
+        backAction,
+      ]
+    }
+
+    // Root page. A selected production structure offers its roster; otherwise
+    // the card shows unit orders plus the build and research entry points.
+    const producible: UnitKind[] =
+      primary?.kind === 'barracks' ? data.infantry
+        : primary?.kind === 'warfactory' ? data.factory
+          : primary?.kind === 'airfield' ? data.air
+            : []
+
+    if (producible.length > 0) {
+      const hotkeys = assignHotkeys(producible, (kind) => UNIT_STATS[kind].label)
+      const queue = productionQueues.find((item) => item.buildingId === primary?.id)
+      const trainActions = producible.map<CommandAction>((kind) => {
+        const stats = UNIT_STATS[kind]
+        const unlocked = isUnitUnlocked(kind, completed)
+        const affordable = credits >= stats.cost
+        return {
+          id: `train-${kind}`,
+          label: stats.label,
+          hotkey: hotkeys.get(kind) ?? '',
+          icon: UI_ICONS[kind],
+          kind: 'train',
+          key: kind,
+          cost: stats.cost,
+          disabled: !unlocked || !affordable,
+          ...(unlocked ? (affordable ? {} : { reason: 'Insufficient credits' }) : { reason: 'Locked behind the tech tree' }),
+        }
+      })
+      if (queue) {
+        trainActions.push({
+          id: 'cancel-production',
+          label: 'Cancel',
+          hotkey: ORDER_HOTKEYS.cancel,
+          icon: ORDER_ICONS.stop,
+          kind: 'order',
+          key: 'cancel-production',
+        })
+      }
+      return trainActions
+    }
+
+    if (primary?.kind === 'techlab') {
+      return [{ id: 'open-research', label: 'Research', hotkey: ORDER_HOTKEYS.research, icon: UI_ICONS.techlab, kind: 'submenu', key: 'research' }]
+    }
+
+    const orders: CommandAction[] = []
+    const hasUnits = selected.some((entity) => entity.kind in UNIT_STATS)
+
+    orders.push({
+      id: 'attack-move',
+      label: attackMoveArmed ? 'Attack (armed)' : 'Attack Move',
+      hotkey: ORDER_HOTKEYS.attackMove,
+      icon: ORDER_ICONS.attack,
+      kind: 'order',
+      key: 'attack-move',
+      disabled: !hasUnits,
+      ...(hasUnits ? {} : { reason: 'Select units first' }),
+    })
+    orders.push({
+      id: 'stop', label: 'Stop', hotkey: ORDER_HOTKEYS.stop, icon: ORDER_ICONS.stop, kind: 'order', key: 'stop',
+      disabled: !hasUnits, ...(hasUnits ? {} : { reason: 'Select units first' }),
+    })
+    orders.push({
+      id: 'center', label: 'Center', hotkey: ORDER_HOTKEYS.center, icon: ORDER_ICONS.center, kind: 'order', key: 'center',
+      disabled: selected.length === 0, ...(selected.length > 0 ? {} : { reason: 'Nothing selected' }),
+    })
+
+    // Assign all ability letters in one pass; assigning them individually would
+    // let two abilities claim the same key, since each call starts fresh.
+    const abilities = ABILITY_DEFS.filter((definition) => definition.faction === faction)
+    const abilityHotkeys = assignHotkeys(abilities, (ability) => ability.label)
+    for (const ability of abilities) {
+      const usable = ability.requiresKinds.length === 0
+        ? selected.length > 0
+        : ability.requiresKinds.some((kind) => selectedKinds.has(kind))
+      orders.push({
+        id: `ability-${ability.key}`,
+        label: ability.label,
+        hotkey: abilityHotkeys.get(ability) ?? '',
+        icon: ORDER_ICONS.attack,
+        kind: 'ability',
+        key: ability.key,
+        disabled: !usable,
+        ...(usable ? {} : { reason: 'No suitable unit selected' }),
+      })
+    }
+
+    // Build is offered whenever a worker is selected, matching how the player
+    // actually constructs; research needs the structure that performs it.
+    const hasWorker = selected.some((entity) => WORKER_KINDS.has(entity.kind as UnitKind))
+    orders.push({
+      id: 'open-build', label: 'Build', hotkey: ORDER_HOTKEYS.build, icon: UI_ICONS.conyard, kind: 'submenu', key: 'build',
+      disabled: !hasWorker && primary?.kind !== 'conyard',
+      ...(hasWorker || primary?.kind === 'conyard' ? {} : { reason: 'Select a worker or your construction yard' }),
+    })
+    // Research is only reachable if the player owns at least one structure that
+    // can perform any of it; otherwise the submenu would be a dead end where
+    // every entry is disabled.
+    const researchBuildings = new Set(
+      Object.values(UPGRADE_DEFS)
+        .filter((definition) => definition.faction === faction && !completed.has(definition.key))
+        .map((definition) => definition.requiredBuilding),
+    )
+    const canResearch = [...researchBuildings].some((kind) => owned.has(kind))
+    orders.push({
+      id: 'open-research', label: 'Research', hotkey: ORDER_HOTKEYS.research, icon: UI_ICONS.techlab, kind: 'submenu', key: 'research',
+      disabled: !canResearch,
+      ...(canResearch ? {} : { reason: researchBuildings.size === 0 ? 'All research complete' : 'No research structure built' }),
+    })
+
+    return orders
+  }, [page, faction, credits, completed, owned, primary, selected, selectedKinds, attackMoveArmed, productionQueues])
+
+  const invoke = useMemo(() => (action: CommandAction) => {
+    if (action.disabled) return
+    switch (action.kind) {
+      case 'build':
+        gameBus.emit('build-structure', action.key as BuildingKind)
+        setPage('root')
+        break
+      case 'train':
+        gameBus.emit('produce-unit', action.key as UnitKind)
+        break
+      case 'research':
+        gameBus.emit('research-upgrade', action.key as UpgradeKey)
+        setPage('root')
+        break
+      case 'ability':
+        gameBus.emit('activate-ability', action.key as Parameters<typeof gameBus.emit<'activate-ability'>>[1])
+        break
+      case 'submenu':
+        setPage(action.key as CardPage)
+        break
+      case 'back':
+        setPage('root')
+        break
+      case 'order':
+        if (action.key === 'attack-move') gameBus.emit('arm-attack-move', undefined)
+        else if (action.key === 'stop') gameBus.emit('stop-selected', undefined)
+        else if (action.key === 'center') gameBus.emit('center-selected', undefined)
+        else if (action.key === 'cancel-production' && primary) gameBus.emit('cancel-production', primary.id)
+        break
+    }
+  }, [primary])
+
+  // Keyboard hotkeys. Bound on window rather than inside Phaser so the card
+  // stays the single source of truth for what each letter currently does.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey || event.altKey) return
+      const target = event.target as HTMLElement | null
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
+
+      if (event.key === 'Escape') {
+        if (page !== 'root') {
+          setPage('root')
+          event.preventDefault()
+        }
+        return
+      }
+
+      const pressed = event.key.toUpperCase()
+      const match = actions.find((action) => action.hotkey === pressed && !action.disabled)
+      if (!match) return
+      event.preventDefault()
+      invoke(match)
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [actions, invoke, page])
+
+  const slots = padToGrid(actions, COMMAND_GRID_SIZE)
+
+  return (
+    <div className="command-card">
+      {placementKind && (
+        <p className="command-placement-hint">
+          Placing {buildingLabel(placementKind, faction)} — left-click the battlefield, Esc cancels.
+        </p>
+      )}
+      <div
+        className="command-grid"
+        role="group"
+        aria-label="Command card"
+        style={{
+          gridTemplateColumns: `repeat(${COMMAND_GRID_COLUMNS}, 1fr)`,
+          gridTemplateRows: `repeat(${COMMAND_GRID_ROWS}, minmax(0, 1fr))`,
+        }}
+      >
+        {slots.map((action, index) => (
+          <CommandButton key={action?.id ?? `empty-${index}`} action={action} onInvoke={invoke} />
+        ))}
+      </div>
+    </div>
+  )
+}

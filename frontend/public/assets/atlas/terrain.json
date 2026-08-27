@@ -1,0 +1,229 @@
+{
+	"textures": [
+		{
+			"image": "terrain.png",
+			"format": "RGBA8888",
+			"size": {
+				"w": 2072,
+				"h": 3626
+			},
+			"scale": 1,
+			"frames": [
+				{
+					"filename": "cliff_face",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 3,
+						"y": 3,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "doodad_crate_cluster",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 3,
+						"y": 521,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "doodad_rock_cluster",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 3,
+						"y": 1039,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "doodad_wreck",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 3,
+						"y": 1557,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "ground_ash",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 3,
+						"y": 2075,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "ground_base",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 3,
+						"y": 2593,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "ground_crystal",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 3,
+						"y": 3111,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "ground_metal",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 521,
+						"y": 3,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "ground_rock",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 1039,
+						"y": 3,
+						"w": 512,
+						"h": 512
+					}
+				},
+				{
+					"filename": "ramp",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 512,
+						"h": 512
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 512,
+						"h": 512
+					},
+					"frame": {
+						"x": 1557,
+						"y": 3,
+						"w": 512,
+						"h": 512
+					}
+				}
+			]
+		}
+	],
+	"meta": {
+		"app": "http://github.com/odrick/free-tex-packer-core",
+		"version": "0.3.9"
+	}
+}

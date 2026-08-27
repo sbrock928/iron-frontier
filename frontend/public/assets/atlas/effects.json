@@ -1,0 +1,187 @@
+{
+	"textures": [
+		{
+			"image": "effects.png",
+			"format": "RGBA8888",
+			"size": {
+				"w": 262,
+				"h": 2096
+			},
+			"scale": 1,
+			"frames": [
+				{
+					"filename": "dust_cloud",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 256,
+						"h": 256
+					},
+					"frame": {
+						"x": 3,
+						"y": 3,
+						"w": 256,
+						"h": 256
+					}
+				},
+				{
+					"filename": "explosion_impact",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 256,
+						"h": 256
+					},
+					"frame": {
+						"x": 3,
+						"y": 265,
+						"w": 256,
+						"h": 256
+					}
+				},
+				{
+					"filename": "explosion_large",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 256,
+						"h": 256
+					},
+					"frame": {
+						"x": 3,
+						"y": 527,
+						"w": 256,
+						"h": 256
+					}
+				},
+				{
+					"filename": "muzzle_flash",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 256,
+						"h": 256
+					},
+					"frame": {
+						"x": 3,
+						"y": 789,
+						"w": 256,
+						"h": 256
+					}
+				},
+				{
+					"filename": "projectile_bolt",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 256,
+						"h": 256
+					},
+					"frame": {
+						"x": 3,
+						"y": 1051,
+						"w": 256,
+						"h": 256
+					}
+				},
+				{
+					"filename": "shield_hit",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 256,
+						"h": 256
+					},
+					"frame": {
+						"x": 3,
+						"y": 1313,
+						"w": 256,
+						"h": 256
+					}
+				},
+				{
+					"filename": "smoke_puff",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 256,
+						"h": 256
+					},
+					"frame": {
+						"x": 3,
+						"y": 1575,
+						"w": 256,
+						"h": 256
+					}
+				},
+				{
+					"filename": "spark_burst",
+					"rotated": false,
+					"trimmed": false,
+					"sourceSize": {
+						"w": 256,
+						"h": 256
+					},
+					"spriteSourceSize": {
+						"x": 0,
+						"y": 0,
+						"w": 256,
+						"h": 256
+					},
+					"frame": {
+						"x": 3,
+						"y": 1837,
+						"w": 256,
+						"h": 256
+					}
+				}
+			]
+		}
+	],
+	"meta": {
+		"app": "http://github.com/odrick/free-tex-packer-core",
+		"version": "0.3.9"
+	}
+}

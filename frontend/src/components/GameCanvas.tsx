@@ -33,7 +33,7 @@ export function GameCanvas({ mission, faction, enemyFaction, difficulty }: { mis
   return (
     <div className="game-stage">
       <div className="game-canvas" ref={hostRef} aria-label="Iron Frontier battlefield" />
-      <div className="camera-help" aria-hidden="true">EDGE SCROLL · WASD/ARROWS · WHEEL ZOOM · CLICK MINIMAP</div>
+      <div className="camera-help" aria-hidden="true">EDGE SCROLL · ARROWS · WHEEL ZOOM · CLICK MINIMAP</div>
       {placementKind && (
         <div
           className="placement-input-layer"

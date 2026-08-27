@@ -1,0 +1,79 @@
+{
+  "$comment": "Terrain tiles must tile seamlessly on all four edges and carry no directional lighting gradient, since BattleScene.drawTerrain blends multiple variants across the tile grid and the scene applies its own directional light rig. Effects are greyscale/white only so they can be tinted per team at runtime.",
+  "terrain": {
+    "ground_base": {
+      "seed": 300101,
+      "subject": "a seamless tileable top-down texture of cracked dry industrial wasteland soil, fine gravel and packed dirt, subtle tonal variation, no directional shadow, uniform flat lighting, muted brown-grey palette, high frequency micro-detail that survives tiling at 512px."
+    },
+    "ground_rock": {
+      "seed": 300102,
+      "subject": "a seamless tileable top-down texture of dark volcanic rock terrain, scattered small stones and rubble, hairline fracture cracks, uniform flat lighting with no directional shadow, cool grey-black palette."
+    },
+    "ground_ash": {
+      "seed": 300103,
+      "subject": "a seamless tileable top-down texture of fine grey ash and cinder ground, scorch patches, faint ember-orange flecks, uniform flat lighting with no directional shadow."
+    },
+    "ground_metal": {
+      "seed": 300104,
+      "subject": "a seamless tileable top-down texture of a rusted industrial metal deck plating floor, riveted seams, oxidation streaks, oil stains, uniform flat lighting with no directional shadow."
+    },
+    "ground_crystal": {
+      "seed": 300105,
+      "subject": "a seamless tileable top-down texture of pale crystalline mineral ground with faint embedded amethyst veins glowing very subtly, smooth worn stone between the veins, uniform flat lighting with no directional shadow."
+    },
+    "cliff_face": {
+      "seed": 300106,
+      "subject": "a top-down view of a rough rock cliff edge tile, one long straight vertical cliff face on the left half transitioning to flat ground on the right half, weathered stone strata, no directional lighting gradient, designed to tile vertically along the cliff edge."
+    },
+    "ramp": {
+      "seed": 300107,
+      "subject": "a top-down view of a diagonal earthen ramp cutting up a rocky cliff, packed dirt switchback path with worn tyre-track ruts, low retaining rubble on both edges, uniform flat lighting, no directional shadow."
+    },
+    "doodad_crate_cluster": {
+      "seed": 300108,
+      "subject": "a small cluster of stacked military supply crates and fuel drums viewed from directly above, weathered olive-drab and rust, transparent background, cast no ground shadow, isolated scatter prop for a top-down RTS map."
+    },
+    "doodad_rock_cluster": {
+      "seed": 300109,
+      "subject": "a small cluster of jagged dark rocks and boulders viewed from directly above, transparent background, cast no ground shadow, isolated scatter prop for a top-down RTS map."
+    },
+    "doodad_wreck": {
+      "seed": 300110,
+      "subject": "a small burnt-out destroyed vehicle wreck viewed from directly above, twisted scorched metal, a crater scorch mark baked into its base only, transparent background elsewhere, isolated scatter prop for a top-down RTS map."
+    }
+  },
+  "effects": {
+    "muzzle_flash": {
+      "seed": 300201,
+      "subject": "a bright greyscale white muzzle flash burst, sharp radiating spikes with a soft glowing core, transparent background, side-facing pointing right, no colour, for additive-blend runtime tinting."
+    },
+    "projectile_bolt": {
+      "seed": 300202,
+      "subject": "a small greyscale white elongated energy bolt streak with a bright core and soft trailing glow, horizontal orientation pointing right, transparent background, no colour, for additive-blend runtime tinting."
+    },
+    "explosion_impact": {
+      "seed": 300203,
+      "subject": "a greyscale white explosive impact burst with a bright core, jagged shockwave rim and soft outer glow, radially symmetric, transparent background, no colour, for additive-blend runtime tinting."
+    },
+    "explosion_large": {
+      "seed": 300204,
+      "subject": "a large greyscale white explosion fireball with billowing soft-edged smoke and a bright radiating core, radially symmetric, transparent background, no colour, for additive-blend runtime tinting."
+    },
+    "smoke_puff": {
+      "seed": 300205,
+      "subject": "a soft greyscale white puff of billowing smoke, wispy irregular edges, transparent background, no colour, for runtime tinting and alpha blending."
+    },
+    "spark_burst": {
+      "seed": 300206,
+      "subject": "a small greyscale white burst of radiating metallic spark lines from a central bright point, transparent background, no colour, for additive-blend runtime tinting."
+    },
+    "shield_hit": {
+      "seed": 300207,
+      "subject": "a greyscale white hexagonal energy shield ripple, a faint radial hex-grid pattern fading outward from an impact point, transparent background, no colour, for additive-blend runtime tinting."
+    },
+    "dust_cloud": {
+      "seed": 300208,
+      "subject": "a low soft greyscale white ground dust cloud, wide and flat, wispy irregular edges, transparent background, no colour, for runtime tinting and alpha blending."
+    }
+  }
+}

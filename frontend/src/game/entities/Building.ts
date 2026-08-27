@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import type { BuildingKind, Faction, SelectedEntity, Team } from '../../types'
-import { BUILDING_STATS, BUILDING_TEXTURES, TEAM_TINT, buildingLabel } from '../config'
+import { BUILDING_STATS, TEAM_TINT, buildingAtlasFrame, buildingLabel } from '../config'
 import type { Damageable } from './Damageable'
 
 export class Building implements Damageable {
@@ -18,7 +18,7 @@ export class Building implements Damageable {
   readonly size: number
   readonly body: Phaser.GameObjects.Image
   private readonly glow: Phaser.GameObjects.Image
-  private readonly shadow: Phaser.GameObjects.Ellipse
+  private readonly shadow: Phaser.GameObjects.Image
   private readonly label: Phaser.GameObjects.Text
   private readonly healthBack: Phaser.GameObjects.Rectangle
   private readonly healthFront: Phaser.GameObjects.Rectangle
@@ -26,6 +26,8 @@ export class Building implements Damageable {
   private readonly shieldFront: Phaser.GameObjects.Rectangle
   private lastDamagedAt = -100000
   private readonly selection: Phaser.GameObjects.Ellipse
+  /** Uniform scale factor `setDisplaySize` computed for this building's atlas frame. Later scale tweens (spawn/recoil) must multiply against this instead of using absolute scale values: the art pipeline rasterises each frame at the building's configured `spriteSize` times a 2x supersample for zoom/HiDPI headroom, so `baseScale` sits near 0.5 rather than 1, and an absolute target would snap the sprite to twice its intended size. */
+  private baseScale = 1
   lastShotAt = 0
   rallyPoint: Phaser.Math.Vector2 | null = null
   private rallyMarker: Phaser.GameObjects.Ellipse | null = null
@@ -44,12 +46,15 @@ export class Building implements Damageable {
     this.y = y
     this.size = stats.size
 
-    const texture = BUILDING_TEXTURES[faction][kind]
-    const shadowWidth = stats.size * 1.08
-    const shadowHeight = stats.size * 0.42
-    this.shadow = scene.add.ellipse(x, y + stats.size * 0.26, shadowWidth, shadowHeight, 0x040505, 0.34)
-    this.glow = scene.add.image(x, y, texture).setDisplaySize(stats.spriteSize.width, stats.spriteSize.height).setAlpha(0.20)
-    this.body = scene.add.image(x, y, texture).setDisplaySize(stats.spriteSize.width, stats.spriteSize.height)
+    const frame = buildingAtlasFrame(kind, faction)
+    // The contact shadow is baked from this building's own alpha silhouette on
+    // a canvas the same size as the colour frame, with the drop offset already
+    // applied, so it lines up simply by sharing the body's position and display
+    // size. It is deliberately not lit — it is an occlusion layer, not a surface.
+    this.shadow = scene.add.image(x, y, 'buildings-shadow', `${frame}_shadow`)
+      .setDisplaySize(stats.spriteSize.width, stats.spriteSize.height)
+    this.glow = scene.add.image(x, y, 'buildings', frame).setDisplaySize(stats.spriteSize.width, stats.spriteSize.height).setAlpha(0.20)
+    this.body = scene.add.image(x, y, 'buildings', frame).setDisplaySize(stats.spriteSize.width, stats.spriteSize.height).setLighting(true)
     this.glow.setTint(team === 'player' ? 0x6bfff2 : 0xaa63ff)
     this.body.setTint(team === 'player' ? TEAM_TINT.player : TEAM_TINT.enemy)
     this.selection = scene.add.ellipse(x, y + stats.size * 0.22, stats.size * 1.16, stats.size * 0.54)
@@ -62,6 +67,7 @@ export class Building implements Damageable {
     this.healthFront = scene.add.rectangle(x - stats.size * 0.36, y - stats.size * 0.44, stats.size * 0.72, 6, team === 'player' ? 0x7dde7d : 0xd987ff).setOrigin(0, 0.5)
     this.shieldBack = scene.add.rectangle(x, y - stats.size * 0.44 - 7, stats.size * 0.72, 4, 0x151126).setVisible(this.maxShield > 0)
     this.shieldFront = scene.add.rectangle(x - stats.size * 0.36, y - stats.size * 0.44 - 7, stats.size * 0.72, 4, 0xb784ff).setOrigin(0, 0.5).setVisible(this.maxShield > 0)
+    this.baseScale = this.body.scaleX
     this.playSpawnTween(scene)
     scene.tweens.add({ targets: this.glow, alpha: { from: 0.10, to: kind === 'power' ? 0.32 : 0.22 }, duration: kind === 'power' ? 900 : 1500, yoyo: true, repeat: -1, ease: 'Sine.InOut' })
     this.syncGraphics()
@@ -87,7 +93,7 @@ export class Building implements Damageable {
   }
 
   toSelectedEntity(): SelectedEntity {
-    return { id: this.id, label: buildingLabel(this.kind, this.faction), kind: this.kind, hp: Math.max(0, Math.round(this.hp)), maxHp: this.maxHp, shield: this.maxShield > 0 ? Math.round(this.shield) : undefined, maxShield: this.maxShield > 0 ? this.maxShield : undefined, team: this.team }
+    return { id: this.id, label: buildingLabel(this.kind, this.faction), kind: this.kind, hp: Math.max(0, Math.round(this.hp)), maxHp: this.maxHp, shield: this.maxShield > 0 ? Math.round(this.shield) : undefined, maxShield: this.maxShield > 0 ? this.maxShield : undefined, team: this.team, faction: this.faction }
   }
 
   takeDamage(amount: number): void {
@@ -120,6 +126,11 @@ export class Building implements Damageable {
     if (this.maxShield > 0) this.shieldFront.displayWidth = this.size * 0.72 * Math.max(0, this.shield / this.maxShield)
   }
 
+  /** Brief procedural "muzzle kick" played whenever this structure's weapon fires (turrets and other armed buildings). */
+  playAttackRecoil(): void {
+    this.body.scene.tweens.add({ targets: this.body, scaleX: this.baseScale * 0.94, scaleY: this.baseScale * 0.94, duration: 80, yoyo: true, ease: 'Quad.Out' })
+  }
+
   setRallyPoint(x: number, y: number): void {
     this.rallyPoint = new Phaser.Math.Vector2(x, y)
     if (!this.rallyMarker) {
@@ -135,7 +146,7 @@ export class Building implements Damageable {
 
   private syncGraphics(): void {
     const depth = 120 + this.y * 0.1
-    this.shadow.setPosition(this.x, this.y + this.size * 0.26).setDepth(depth - 2)
+    this.shadow.setPosition(this.x, this.y).setDepth(depth - 2)
     this.glow.setPosition(this.x, this.y).setDepth(depth - 1)
     this.body.setPosition(this.x, this.y).setDepth(depth)
     this.selection.setPosition(this.x, this.y + this.size * 0.22).setDepth(depth - 3)
@@ -147,17 +158,21 @@ export class Building implements Damageable {
   }
 
   private playSpawnTween(scene: Phaser.Scene): void {
-    this.body.setScale(0.8)
-    this.glow.setScale(0.92)
-    scene.tweens.add({ targets: this.body, scaleX: 1, scaleY: 1, duration: 250, ease: 'Back.Out' })
+    this.body.setScale(this.baseScale * 0.8)
+    this.glow.setScale(this.baseScale)
+    scene.tweens.add({ targets: this.body, scaleX: this.baseScale, scaleY: this.baseScale, duration: 250, ease: 'Back.Out' })
     scene.tweens.add({ targets: this.glow, alpha: { from: 0.35, to: 0.2 }, duration: 350, ease: 'Sine.Out' })
   }
 
   destroy(): void {
     const scene = this.body.scene
     scene.sound.play('sfx-explosion', { volume: this.kind === 'turret' ? 0.32 : 0.46 })
-    const explosion = scene.add.image(this.x, this.y, 'fx-explosion').setScale(0.18).setDepth(10000)
+    const explosion = scene.add.image(this.x, this.y, 'effects', 'explosion_large').setScale(0.18).setDepth(10000)
     scene.tweens.add({ targets: explosion, scaleX: this.kind === 'turret' ? 0.8 : 1.1, scaleY: this.kind === 'turret' ? 0.8 : 1.1, alpha: 0, duration: 360, onComplete: () => explosion.destroy() })
+    if (scene.lights) {
+      const light = scene.lights.addLight(this.x, this.y, this.kind === 'turret' ? 170 : 240, 0xffb27a, 2.4)
+      scene.tweens.add({ targets: light, intensity: 0, duration: 420, onComplete: () => scene.lights.removeLight(light) })
+    }
     const wreck = scene.add.image(this.x, this.y + this.size * 0.14, 'wreck-building')
       .setDisplaySize(this.kind === 'turret' ? 78 : Math.max(104, this.size * 1.08), this.kind === 'turret' ? 78 : Math.max(104, this.size * 1.08))
       .setTint(this.team === 'player' ? 0xa4b4ae : 0x9b77b9)
