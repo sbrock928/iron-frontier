@@ -44,6 +44,8 @@ export class Unit implements Damageable {
   private readonly shieldFront: Phaser.GameObjects.Rectangle
   private readonly spriteWidth: number
   private readonly spriteHeight: number
+  /** Uniform scale factor `setDisplaySize` computed for this unit's atlas frame. All later scale tweens (spawn/idle/walk/recoil) must multiply against this instead of using absolute scale values, since the atlas frames are untrimmed 512px canvases far larger than any unit's configured display size. */
+  private baseScale = 1
   private path: Phaser.Math.Vector2[] = []
   attackTarget: Damageable | null = null
   attackTargetMode: 'manual' | 'auto' | null = null
@@ -71,6 +73,8 @@ export class Unit implements Damageable {
   private damageReduction = 0
   private shieldRegenModifier = 1
   private lastDamagedAt = -100000
+  private isMovingState = false
+  private loopTween: Phaser.Tweens.Tween | null = null
 
   constructor(scene: Phaser.Scene, id: string, kind: UnitKind, team: Team, x: number, y: number) {
     this.id = id
@@ -101,8 +105,10 @@ export class Unit implements Damageable {
     this.healthFront = scene.add.rectangle(x - 21, y - this.spriteHeight * 0.54, 42, 5, team === 'player' ? 0x78e985 : 0xd987ff).setOrigin(0, 0.5)
     this.shieldBack = scene.add.rectangle(x, y - this.spriteHeight * 0.54 - 6, 42, 4, 0x10101b).setOrigin(0.5).setVisible(this.maxShield > 0)
     this.shieldFront = scene.add.rectangle(x - 21, y - this.spriteHeight * 0.54 - 6, 42, 4, 0xa67cff).setOrigin(0, 0.5).setVisible(this.maxShield > 0)
+    this.baseScale = this.body.scaleX
     this.playSpawnTween(scene)
     this.syncGraphics()
+    scene.time.delayedCall(230, () => { if (this.alive) this.setMoving(false) })
   }
 
   get baseStats() { return UNIT_STATS[this.kind] }
@@ -346,9 +352,31 @@ export class Unit implements Damageable {
   }
 
   private setMoving(moving: boolean): void {
-    void moving
-    // No sprite-sheet walk cycles exist for the realistic atlas art; movement is conveyed via rotation only for now.
-    // Reserved for future procedural animation (idle/walk bob).
+    // No sprite-sheet walk cycles exist for the realistic atlas art, so
+    // movement/idle "life" is conveyed procedurally via a looping squash
+    // tween on the hull sprite (turret/glow are reserved for attack recoil
+    // and shield-hit flashes respectively, so no tween properties overlap).
+    // All scale targets are multiples of `baseScale` (never absolute values)
+    // since the underlying atlas frame is a much larger untrimmed canvas.
+    if (this.isMovingState === moving) return
+    this.isMovingState = moving
+    this.loopTween?.stop()
+    this.body.setScale(this.baseScale)
+    const scene = this.body.scene
+    this.loopTween = moving
+      ? scene.tweens.add({ targets: this.body, scaleX: this.baseScale * 0.93, scaleY: this.baseScale * 1.07, duration: Math.max(90, 220 - this.speed * 0.35), yoyo: true, repeat: -1, ease: 'Sine.InOut' })
+      : scene.tweens.add({ targets: this.body, scaleY: this.baseScale * 1.025, duration: 1500 + Math.random() * 500, yoyo: true, repeat: -1, ease: 'Sine.InOut', delay: Math.random() * 400 })
+  }
+
+  /** Brief procedural "muzzle kick" played whenever this unit fires. Targets the turret when present so it never fights the idle/walk loop tween running on the hull. */
+  playAttackRecoil(): void {
+    const scene = this.body.scene
+    if (this.turret) {
+      scene.tweens.add({ targets: this.turret, scaleX: this.baseScale * 0.86, scaleY: this.baseScale * 0.86, duration: 70, yoyo: true, ease: 'Quad.Out' })
+    } else {
+      const restingAlpha = this.maxShield > 0 ? 0.23 : 0.16
+      scene.tweens.add({ targets: this.glow, scaleX: this.baseScale * 1.2, scaleY: this.baseScale * 1.2, alpha: Math.min(1, restingAlpha + 0.35), duration: 90, yoyo: true, ease: 'Quad.Out', onComplete: () => this.glow.setAlpha(restingAlpha) })
+    }
   }
 
   private syncGraphics(): void {
@@ -366,13 +394,14 @@ export class Unit implements Damageable {
   }
 
   private playSpawnTween(scene: Phaser.Scene): void {
-    this.body.setScale(0.72); this.glow.setScale(0.84); this.turret?.setScale(0.72)
+    this.body.setScale(this.baseScale * 0.72); this.glow.setScale(this.baseScale * 0.84); this.turret?.setScale(this.baseScale * 0.72)
     const bodyTargets = this.turret ? [this.body, this.turret] : [this.body]
-    scene.tweens.add({ targets: bodyTargets, scaleX: 1, scaleY: 1, duration: 220, ease: 'Back.Out' })
-    scene.tweens.add({ targets: [this.glow], scaleX: 1, scaleY: 1, duration: 260, ease: 'Sine.Out' })
+    scene.tweens.add({ targets: bodyTargets, scaleX: this.baseScale, scaleY: this.baseScale, duration: 220, ease: 'Back.Out' })
+    scene.tweens.add({ targets: [this.glow], scaleX: this.baseScale, scaleY: this.baseScale, duration: 260, ease: 'Sine.Out' })
   }
 
   destroy(): void {
+    this.loopTween?.stop()
     const scene = this.body.scene
     scene.sound.play('sfx-explosion', { volume: this.baseStats.role === 'infantry' || this.baseStats.role === 'support' ? 0.18 : 0.32 })
     const explosion = scene.add.image(this.x, this.y, 'effects', 'explosion_large').setScale(0.1).setDepth(10000)

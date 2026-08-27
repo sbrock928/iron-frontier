@@ -57,13 +57,22 @@ export function BuildPanel() {
       <UnitGrid title={buildingLabel('airfield', faction)} hint="Air-superiority and advanced flying combat units." units={data.air} />
 
       <div className="section-title queue-title"><span>Live Queues</span><small>{queues.length} ACTIVE</small></div>
-      {queues.length === 0 ? <p className="muted">Production structures are idle.</p> : queues.map((queue) => (
+      {queues.length === 0 ? <p className="muted">Production structures are idle.</p> : queues.map((queue) => {
+        const shown = queue.queuedKinds.slice(0, 5)
+        const overflow = queue.queuedKinds.length - shown.length
+        return (
         <div className="production-queue" key={queue.buildingId}>
           <div className="queue-head"><strong>{queue.buildingLabel}</strong><span>{queue.activeLabel}</span></div>
           <div className="queue-progress"><i style={{ width: `${Math.round(queue.progress * 100)}%` }} /></div>
+          {queue.queuedKinds.length > 0 && (
+            <div className="queue-upcoming">
+              {shown.map((kind, index) => <img key={`${kind}-${index}`} src={UI_ICONS[kind]} alt={UNIT_STATS[kind].label} title={UNIT_STATS[kind].label} />)}
+              {overflow > 0 && <span className="queue-overflow">+{overflow}</span>}
+            </div>
+          )}
           <div className="queue-foot"><span>{Math.round(queue.progress * 100)}%</span><span>{queue.queuedKinds.length} waiting</span><button onClick={() => gameBus.emit('cancel-production', queue.buildingId)}>Cancel</button></div>
         </div>
-      ))}
+        )})}
     </section>
   )
 }

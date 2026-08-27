@@ -26,6 +26,8 @@ export class Building implements Damageable {
   private readonly shieldFront: Phaser.GameObjects.Rectangle
   private lastDamagedAt = -100000
   private readonly selection: Phaser.GameObjects.Ellipse
+  /** Uniform scale factor `setDisplaySize` computed for this building's atlas frame. Later scale tweens (spawn/recoil) must multiply against this instead of using absolute scale values, since the atlas frames are untrimmed 512px canvases far larger than any building's configured display size. */
+  private baseScale = 1
   lastShotAt = 0
   rallyPoint: Phaser.Math.Vector2 | null = null
   private rallyMarker: Phaser.GameObjects.Ellipse | null = null
@@ -62,6 +64,7 @@ export class Building implements Damageable {
     this.healthFront = scene.add.rectangle(x - stats.size * 0.36, y - stats.size * 0.44, stats.size * 0.72, 6, team === 'player' ? 0x7dde7d : 0xd987ff).setOrigin(0, 0.5)
     this.shieldBack = scene.add.rectangle(x, y - stats.size * 0.44 - 7, stats.size * 0.72, 4, 0x151126).setVisible(this.maxShield > 0)
     this.shieldFront = scene.add.rectangle(x - stats.size * 0.36, y - stats.size * 0.44 - 7, stats.size * 0.72, 4, 0xb784ff).setOrigin(0, 0.5).setVisible(this.maxShield > 0)
+    this.baseScale = this.body.scaleX
     this.playSpawnTween(scene)
     scene.tweens.add({ targets: this.glow, alpha: { from: 0.10, to: kind === 'power' ? 0.32 : 0.22 }, duration: kind === 'power' ? 900 : 1500, yoyo: true, repeat: -1, ease: 'Sine.InOut' })
     this.syncGraphics()
@@ -120,6 +123,11 @@ export class Building implements Damageable {
     if (this.maxShield > 0) this.shieldFront.displayWidth = this.size * 0.72 * Math.max(0, this.shield / this.maxShield)
   }
 
+  /** Brief procedural "muzzle kick" played whenever this structure's weapon fires (turrets and other armed buildings). */
+  playAttackRecoil(): void {
+    this.body.scene.tweens.add({ targets: this.body, scaleX: this.baseScale * 0.94, scaleY: this.baseScale * 0.94, duration: 80, yoyo: true, ease: 'Quad.Out' })
+  }
+
   setRallyPoint(x: number, y: number): void {
     this.rallyPoint = new Phaser.Math.Vector2(x, y)
     if (!this.rallyMarker) {
@@ -147,9 +155,9 @@ export class Building implements Damageable {
   }
 
   private playSpawnTween(scene: Phaser.Scene): void {
-    this.body.setScale(0.8)
-    this.glow.setScale(0.92)
-    scene.tweens.add({ targets: this.body, scaleX: 1, scaleY: 1, duration: 250, ease: 'Back.Out' })
+    this.body.setScale(this.baseScale * 0.8)
+    this.glow.setScale(this.baseScale)
+    scene.tweens.add({ targets: this.body, scaleX: this.baseScale, scaleY: this.baseScale, duration: 250, ease: 'Back.Out' })
     scene.tweens.add({ targets: this.glow, alpha: { from: 0.35, to: 0.2 }, duration: 350, ease: 'Sine.Out' })
   }
 

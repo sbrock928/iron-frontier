@@ -77,6 +77,7 @@ export class CombatSystem {
 
       if (time - unit.lastShotAt >= unit.cooldown) {
         unit.lastShotAt = time
+        unit.playAttackRecoil()
         this.fire(unit.x, unit.y + (unit.isFlying ? -14 : 0), target, unit.damage, unit.team === 'player' ? 0x8cf5ff : 0xbf86ff)
       }
     }
@@ -89,6 +90,7 @@ export class CombatSystem {
       const target = this.findStructureTarget(structure, weapon.range, canEngage)
       if (!target) continue
       structure.lastShotAt = time
+      structure.playAttackRecoil()
       this.fire(structure.x, structure.y, target, weapon.damage, structure.team === 'player' ? 0x8cf5ff : 0xbf86ff)
     }
   }

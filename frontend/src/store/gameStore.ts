@@ -18,6 +18,7 @@ type GameState = {
   researchQueues: ResearchQueueView[]
   completedUpgrades: UpgradeKey[]
   attackMoveArmed: boolean
+  controlGroups: Record<number, number>
   setMission: (mission: Mission) => void
   setMissionCatalog: (missions: Mission[]) => void
   setFaction: (faction: Faction) => void
@@ -31,6 +32,7 @@ type GameState = {
   setResearchQueues: (queues: ResearchQueueView[]) => void
   setCompletedUpgrades: (upgrades: UpgradeKey[]) => void
   setAttackMoveArmed: (armed: boolean) => void
+  setControlGroups: (groups: Record<number, number>) => void
   resetBattleState: () => void
 }
 
@@ -51,9 +53,10 @@ export const useGameStore = create<GameState>((set) => ({
   researchQueues: [],
   completedUpgrades: [],
   attackMoveArmed: false,
-  setMission: (mission) => set({ mission, credits: mission.definition.starting_credits, status: 'playing', selected: [], productionQueues: [], researchQueues: [], completedUpgrades: [], attackMoveArmed: false }),
+  controlGroups: {},
+  setMission: (mission) => set({ mission, credits: mission.definition.starting_credits, status: 'playing', selected: [], productionQueues: [], researchQueues: [], completedUpgrades: [], attackMoveArmed: false, controlGroups: {} }),
   setMissionCatalog: (missions) => set({ missions }),
-  setFaction: (faction) => set({ faction, selected: [], placementKind: null, productionQueues: [], researchQueues: [], completedUpgrades: [], attackMoveArmed: false }),
+  setFaction: (faction) => set({ faction, selected: [], placementKind: null, productionQueues: [], researchQueues: [], completedUpgrades: [], attackMoveArmed: false, controlGroups: {} }),
   setEnemyFaction: (enemyFaction) => set({ enemyFaction }),
   setDifficulty: (difficulty) => set({ difficulty }),
   setEconomy: (credits, powerUsed, powerCapacity) => set({ credits, powerUsed, powerCapacity }),
@@ -64,5 +67,6 @@ export const useGameStore = create<GameState>((set) => ({
   setResearchQueues: (researchQueues) => set({ researchQueues }),
   setCompletedUpgrades: (completedUpgrades) => set({ completedUpgrades }),
   setAttackMoveArmed: (attackMoveArmed) => set({ attackMoveArmed }),
-  resetBattleState: () => set({ credits: 0, powerUsed: 0, powerCapacity: 0, selected: [], status: 'loading', placementKind: null, productionQueues: [], researchQueues: [], completedUpgrades: [], attackMoveArmed: false }),
+  setControlGroups: (controlGroups) => set({ controlGroups }),
+  resetBattleState: () => set({ credits: 0, powerUsed: 0, powerCapacity: 0, selected: [], status: 'loading', placementKind: null, productionQueues: [], researchQueues: [], completedUpgrades: [], attackMoveArmed: false, controlGroups: {} }),
 }))

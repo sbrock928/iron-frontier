@@ -17,6 +17,8 @@ import { SupportSystem } from '../systems/SupportSystem'
 import { ProductionSystem } from '../systems/ProductionSystem'
 import { ResearchSystem } from '../systems/ResearchSystem'
 import { LocalAvoidanceSystem } from '../systems/LocalAvoidanceSystem'
+import { ControlGroupManager } from '../systems/ControlGroupManager'
+import { MinimapController } from '../systems/MinimapController'
 
 export class BattleScene extends Phaser.Scene {
   private readonly mission: Mission
@@ -45,8 +47,7 @@ export class BattleScene extends Phaser.Scene {
   private readonly completedUpgrades = new Set<UpgradeKey>()
   private readonly enemyCompletedUpgrades = new Set<UpgradeKey>()
   private attackMoveArmed = false
-  private readonly controlGroups = new Map<number, string[]>()
-  private readonly lastGroupRecallAt = new Map<number, number>()
+  private readonly controlGroups = new ControlGroupManager()
   private dragStart: Phaser.Math.Vector2 | null = null
   private selectionBox: Phaser.GameObjects.Rectangle | null = null
   private placementKind: BuildingKind | null = null
@@ -59,7 +60,7 @@ export class BattleScene extends Phaser.Scene {
   private edgePanX = 0
   private edgePanY = 0
   private readonly edgePanMargin = 34
-  private readonly minimapRect = new Phaser.Geom.Rectangle(16, 16, 188, 110)
+  private minimap?: MinimapController
   private audioStarted = false
   private ambientSound: Phaser.Sound.BaseSound | null = null
 
@@ -122,6 +123,7 @@ export class BattleScene extends Phaser.Scene {
     useGameStore.getState().setProductionQueues([])
     useGameStore.getState().setResearchQueues([])
     useGameStore.getState().setAttackMoveArmed(false)
+    useGameStore.getState().setControlGroups({})
     this.credits = definition.starting_credits
     this.cameras.main.setBounds(0, 0, definition.world_width, definition.world_height)
     this.cameras.main.centerOn(definition.player_spawn.x + 250, definition.player_spawn.y)
@@ -186,6 +188,7 @@ export class BattleScene extends Phaser.Scene {
     this.selectedUnits = this.selectedUnits.filter((item) => item.alive)
     if (this.selectedBuilding && !this.selectedBuilding.alive) this.selectedBuilding = null
     this.checkEndState()
+    this.minimap?.redraw(this.units, this.buildings, this.patches, (x, y) => this.fog.isVisible(x, y), this.cameras.main)
     if (time >= this.nextStoreSyncAt) {
       this.nextStoreSyncAt = time + 180
       this.syncStore(false)
@@ -193,16 +196,25 @@ export class BattleScene extends Phaser.Scene {
   }
 
   /**
-   * Enables Phaser's Light2D pipeline with a dim ambient colour matching the
+   * Enables Phaser's Light2D pipeline with a moody ambient colour matching the
    * game's dark, overcast aesthetic, and binds each colour atlas to its
    * paired normal-map atlas so lit units/buildings pick up per-pixel bump
    * shading from dynamic lights (muzzle flashes, explosions). Atlases with no
    * authored normal map (terrain, effects) fall back to Phaser's built-in
    * flat normal, which still lets them receive flat diffuse lighting.
+   *
+   * Ambient colour alone leaves normal-mapped surfaces flat and under-lit
+   * (no light source means no directional highlight, just a dim uniform
+   * tint), so a single very-large-radius "sky fill" light is added across
+   * the whole map to act like an overcast sun — bright enough that units and
+   * buildings read clearly, while its huge radius keeps the falloff gentle
+   * so it doesn't look like a single point light source.
    */
   private setupLighting(): void {
     this.lights.enable()
-    this.lights.setAmbientColor(0x4a5246)
+    this.lights.setAmbientColor(0x6b7566)
+    const { world_width: width, world_height: height } = this.mission.definition
+    this.lights.addLight(width / 2, height / 2, Math.max(width, height) * 0.9, 0xeaf0e2, 1.4)
 
     const bindNormalMap = (colorKey: string, normalKey: string) => {
       if (!this.textures.exists(colorKey) || !this.textures.exists(normalKey)) return
@@ -314,7 +326,7 @@ export class BattleScene extends Phaser.Scene {
 
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       this.startAudio()
-      if (pointer.button === 0 && this.handleMinimapClick(pointer.x, pointer.y)) return
+      if (pointer.button === 0 && (this.minimap?.handleClick(pointer.x, pointer.y, this.cameras.main) ?? false)) return
       const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
       if (pointer.button === 2) {
         if (this.placementKind) {
@@ -408,6 +420,7 @@ export class BattleScene extends Phaser.Scene {
     this.unsubscribers.push(gameBus.on('center-selected', () => this.centerSelected()))
     this.unsubscribers.push(gameBus.on('arm-attack-move', () => this.armAttackMove()))
     this.unsubscribers.push(gameBus.on('activate-ability', (ability) => this.activateAbility(ability)))
+    this.unsubscribers.push(gameBus.on('recall-control-group', (group) => this.recallControlGroup(group)))
 
     const dispose = () => this.disposeBridge()
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, dispose)
@@ -471,7 +484,7 @@ export class BattleScene extends Phaser.Scene {
     const margin = this.edgePanMargin
 
     // Don't edge-scroll while interacting with the fixed-position minimap.
-    if (this.minimapRect.contains(pointer.x, pointer.y)) {
+    if (this.minimap?.containsScreenPoint(pointer.x, pointer.y)) {
       this.edgePanX = 0
       this.edgePanY = 0
       return
@@ -479,18 +492,6 @@ export class BattleScene extends Phaser.Scene {
 
     this.edgePanX = pointer.x <= margin ? -1 : pointer.x >= width - margin ? 1 : 0
     this.edgePanY = pointer.y <= margin ? -1 : pointer.y >= height - margin ? 1 : 0
-  }
-
-  private handleMinimapClick(screenX: number, screenY: number): boolean {
-    if (!this.minimapRect.contains(screenX, screenY)) return false
-    const u = Phaser.Math.Clamp((screenX - this.minimapRect.x) / this.minimapRect.width, 0, 1)
-    const v = Phaser.Math.Clamp((screenY - this.minimapRect.y) / this.minimapRect.height, 0, 1)
-    const worldX = u * this.mission.definition.world_width
-    const worldY = v * this.mission.definition.world_height
-    this.cameras.main.centerOn(worldX, worldY)
-    this.edgePanX = 0
-    this.edgePanY = 0
-    return true
   }
 
   private selectAt(x: number, y: number, additive: boolean): void {
@@ -904,12 +905,13 @@ export class BattleScene extends Phaser.Scene {
       ? [this.selectedBuilding.id]
       : this.selectedUnits.map((unit) => unit.id)
     if (ids.length === 0) return
-    this.controlGroups.set(group, ids)
+    this.controlGroups.assign(group, ids)
     useGameStore.getState().setStatus('playing', `Control group ${group} assigned (${ids.length}).`)
+    this.syncControlGroupSizes()
   }
 
   private recallControlGroup(group: number): void {
-    const ids = this.controlGroups.get(group)
+    const ids = this.controlGroups.idsFor(group)
     if (!ids || ids.length === 0) return
     this.clearSelection()
     const unitMatches = this.units.filter((unit) => unit.alive && unit.team === 'player' && ids.includes(unit.id))
@@ -922,10 +924,14 @@ export class BattleScene extends Phaser.Scene {
       this.selectedUnits.forEach((unit) => unit.setSelected(true))
     }
     this.syncSelection()
-    const now = this.time.now
-    const previous = this.lastGroupRecallAt.get(group) ?? -1000
-    this.lastGroupRecallAt.set(group, now)
-    if (now - previous < 450) this.centerSelected()
+    const isDoubleTap = this.controlGroups.recordRecall(group, this.time.now)
+    if (isDoubleTap) this.centerSelected()
+  }
+
+  private syncControlGroupSizes(): void {
+    const isAlive = (id: string) =>
+      this.units.some((unit) => unit.id === id && unit.alive) || this.buildings.some((building) => building.id === id && building.alive)
+    useGameStore.getState().setControlGroups(this.controlGroups.sizes(isAlive))
   }
 
   private resumeAttackMoves(): void {
@@ -1023,6 +1029,7 @@ export class BattleScene extends Phaser.Scene {
     store.setResearchQueues(this.research?.getPlayerViews() ?? [])
     store.setCompletedUpgrades([...this.completedUpgrades])
     store.setAttackMoveArmed(this.attackMoveArmed)
+    this.syncControlGroupSizes()
     if (forceSelection || this.selectedUnits.length > 0 || this.selectedBuilding) this.syncSelection()
   }
 
@@ -1039,16 +1046,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private createMinimap(): void {
-    const width = 188
-    const height = 110
-    const mini = this.cameras.add(16, 16, width, height, false, 'minimap')
-    mini.setBounds(0, 0, this.mission.definition.world_width, this.mission.definition.world_height)
-    mini.centerOn(this.mission.definition.world_width / 2, this.mission.definition.world_height / 2)
-    mini.setZoom(Math.min(width / this.mission.definition.world_width, height / this.mission.definition.world_height))
-    const border = this.add.rectangle(16 + width / 2, 16 + height / 2, width + 6, height + 6, 0x0b0e0c, 0.2)
-      .setStrokeStyle(2, 0xb8c5ba)
-      .setScrollFactor(0)
-      .setDepth(9999)
-    mini.ignore(border)
+    this.minimap?.destroy()
+    this.minimap = new MinimapController(this, this.mission.definition.world_width, this.mission.definition.world_height)
   }
 }

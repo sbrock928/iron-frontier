@@ -7,6 +7,7 @@ export function CommandPanel({ onExitToMenu }: { onExitToMenu: () => void }) {
   const state = useGameStore()
   const [saveLabel, setSaveLabel] = useState('Quick Save')
   const kinds = useMemo(() => new Set(state.selected.map((item) => item.kind)), [state.selected])
+  const groupNumbers = useMemo(() => Array.from({ length: 9 }, (_, index) => index + 1), [])
 
   const quickSave = async () => {
     if (!state.mission) return
@@ -52,6 +53,23 @@ export function CommandPanel({ onExitToMenu }: { onExitToMenu: () => void }) {
         <button onClick={() => gameBus.emit('center-selected', undefined)}>Center</button>
         <button onClick={() => gameBus.emit('stop-selected', undefined)}>Stop</button>
         <button onClick={() => void quickSave()}>{saveLabel}</button>
+      </div>
+      <div className="control-group-bar">
+        {groupNumbers.map((group) => {
+          const size = state.controlGroups[group]
+          return (
+            <button
+              key={group}
+              className={`control-group-badge ${size ? 'has-members' : ''}`.trim()}
+              disabled={!size}
+              title={size ? `Recall group ${group} (${size} unit${size === 1 ? '' : 's'})` : `Group ${group} is empty`}
+              onClick={() => gameBus.emit('recall-control-group', group)}
+            >
+              <span>{group}</span>
+              {size ? <small>{size}</small> : null}
+            </button>
+          )
+        })}
       </div>
       <p className="muted command-hint">Shift+A: attack-move · Ctrl+1–9: assign group · 1–9: recall · right-click selected production building: set rally point.</p>
       <div className="command-footer two"><button onClick={() => gameBus.emit('restart-game', undefined)}>Restart</button><button onClick={onExitToMenu}>Main Menu</button></div>

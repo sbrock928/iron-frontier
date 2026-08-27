@@ -15,6 +15,7 @@ type Events = {
   'center-selected': undefined
   'arm-attack-move': undefined
   'activate-ability': AbilityKey
+  'recall-control-group': number
 }
 
 type Handler<K extends keyof Events> = (payload: Events[K]) => void
