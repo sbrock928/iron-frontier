@@ -16,7 +16,7 @@ look the project started with.
 
 These exist so that 178 independently generated assets composite into one
 coherent scene. They are enforced in the prompt preamble and verified by
-`scripts/art/process.ts`.
+`scripts/art/process-art.ts`.
 
 | Constraint | Value | Why |
 |---|---|---|
@@ -26,9 +26,9 @@ coherent scene. They are enforced in the prompt preamble and verified by
 | Key light | Top-left, ~35° elevation, neutral white | All shadows fall bottom-right, consistently |
 | Fill light | Cool blue-grey bounce from bottom-right, 25% intensity | Keeps shadow detail readable on dark terrain |
 | Background | Fully transparent | Composited over terrain |
-| Framing | Single centred subject, ~10% margin | `process.ts` trims and re-centres, but needs headroom |
-| Source resolution | 1024×1024 (generator maximum) | Downsampled to `spriteSize`; never upscaled. 1024px still gives ~9x headroom over the largest unit (118px) |
-| Ground shadow | **Excluded from the sprite** | Drawn at runtime as a separate contact-shadow ellipse |
+| Framing | Single centred subject, ~10% margin | `process-art.ts` trims and re-centres, but needs headroom |
+| Source resolution | 1024×1024 (generator maximum) | Downsampled to 2× the sprite's on-screen size; never upscaled |
+| Ground shadow | **Excluded from the sprite** | `process-art.ts` derives a squashed contact shadow from the alpha channel into `{name}_shadow.png`, drawn under the sprite at runtime |
 | Outlines | None | No cel shading, no toon outline, no sticker border |
 
 ## 2. Material language
@@ -44,8 +44,16 @@ coherent scene. They are enforced in the prompt preamble and verified by
 
 ## 3. Faction identity
 
-Faction is expressed through form language and a single accent hue. The accent is
-isolated into a tint mask by `process.ts` so it can be recoloured per player.
+Faction is expressed through form language and a single accent hue, both baked
+directly into the generated art.
+
+> **No runtime recolouring.** An earlier design isolated the accent hue into a
+> tint mask so it could be swapped per player. That pass was removed: hue
+> analysis of the generated art showed the saturated pixels rarely land near the
+> nominal accent hue (e.g. `tank.png` is dominated by 40–60° orange while the
+> Aegis accent is ~175° cyan), so the masks came out essentially empty. Accent
+> colour is therefore the generator's responsibility — get it right in the
+> prompt, because nothing downstream will fix it.
 
 ### Aegis Expeditionary — accent `#66e8dd` (cyan)
 Human industrial military. Boxy, bolted, utilitarian. Olive-drab and gunmetal
@@ -96,7 +104,7 @@ watermarks · visible background · multiple subjects in frame · motion blur.
 
 ```
 art/prompts/*.json   ──▶ npm run art:gen     ──▶ art/src/**       (1024px raw, committed)
-art/src/**           ──▶ npm run art:process ──▶ art/build/**     (trimmed, sized, normals)
+art/src/**           ──▶ npm run art:process ──▶ art/build/**     (despilled, trimmed, sized, + `_n` normals and `_shadow` contact shadows)
 art/build/**         ──▶ npm run art:pack    ──▶ frontend/public/assets/atlas/*
 ```
 

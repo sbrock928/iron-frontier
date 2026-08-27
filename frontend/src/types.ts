@@ -65,6 +65,72 @@ export type SelectedEntity = {
   shield?: number
   maxShield?: number
   team: Team
+  /**
+   * The owning faction. Buildings share `kind` values across all three factions
+   * (every race has a `conyard`), so the HUD needs this to pick the right icon
+   * and label. Units have faction-unique kinds and therefore omit it.
+   */
+  faction?: Faction
+}
+
+/** How prominently an alert is surfaced, and how long it lingers. */
+export type AlertSeverity = 'info' | 'warning' | 'critical'
+
+/**
+ * A timestamped notification surfaced in the alert log. Alerts replace the old
+ * single-slot status line, which could only ever show the most recent message
+ * and silently dropped anything that happened while the player was reading.
+ */
+export type GameAlert = {
+  id: number
+  severity: AlertSeverity
+  message: string
+  /** Wall-clock ms, used for age-out and ordering. */
+  at: number
+  /** World position to centre the camera on when the alert is clicked, if any. */
+  at_world?: Point
+}
+
+/** A single entity's position as drawn on the minimap. */
+export type MinimapBlip = {
+  x: number
+  y: number
+  team: Team | 'neutral'
+  /** Structures are drawn larger and squarer than units. */
+  structure: boolean
+}
+
+/**
+ * Everything the DOM minimap needs for one repaint. The scene pushes these on a
+ * fixed low-rate timer rather than the React tree reading game state directly,
+ * which keeps Phaser as the single owner of simulation state.
+ */
+export type MinimapSnapshot = {
+  worldWidth: number
+  worldHeight: number
+  blips: MinimapBlip[]
+  /** Camera viewport in world coordinates, drawn as the minimap's view rectangle. */
+  view: { x: number; y: number; width: number; height: number }
+}
+
+/**
+ * One button on the command card. `kind` tells the scene how to interpret `key`
+ * when the action is dispatched, so the card stays a dumb renderer and all
+ * game rules stay in the scene.
+ */
+export type CommandAction = {
+  id: string
+  label: string
+  /** Single-character hotkey hint shown in the button corner. */
+  hotkey: string
+  icon: string
+  kind: 'build' | 'train' | 'research' | 'ability' | 'order' | 'submenu' | 'back'
+  key: string
+  cost?: number
+  /** Disabled buttons still occupy their grid slot so positions stay muscle-memory stable. */
+  disabled?: boolean
+  /** Why the action is unavailable, shown on hover. */
+  reason?: string
 }
 
 export type ProductionQueueView = {
@@ -88,4 +154,35 @@ export type MatchSetup = {
   playerFaction: Faction
   enemyFaction: Faction
   difficulty: Difficulty
+}
+
+/**
+ * What we persist in a save slot.
+ *
+ * This deliberately records the *deployment* (which matchup was being played)
+ * plus a snapshot of the economy for display in the menu. It is NOT a full
+ * battle serialisation — unit positions, buildings, production queues, research
+ * and fog are not captured, so loading a slot restages the same matchup from
+ * its opening state rather than resuming mid-battle. The UI says exactly that;
+ * see `MainMenu`'s deployment log.
+ *
+ * Field names are snake_case because this object crosses the wire verbatim as
+ * the free-form `payload` of the backend's `SaveGameWrite`.
+ */
+export type SaveGamePayload = {
+  faction: Faction
+  enemy_faction: Faction
+  difficulty: Difficulty
+  credits: number
+  supply_used: number
+  supply_cap: number
+  status: GameStatus
+  saved_at: string
+}
+
+export type SaveGame = {
+  slot: string
+  mission_id: string
+  payload: SaveGamePayload
+  updated_at: string
 }

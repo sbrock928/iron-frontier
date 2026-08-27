@@ -18,7 +18,7 @@ export class Building implements Damageable {
   readonly size: number
   readonly body: Phaser.GameObjects.Image
   private readonly glow: Phaser.GameObjects.Image
-  private readonly shadow: Phaser.GameObjects.Ellipse
+  private readonly shadow: Phaser.GameObjects.Image
   private readonly label: Phaser.GameObjects.Text
   private readonly healthBack: Phaser.GameObjects.Rectangle
   private readonly healthFront: Phaser.GameObjects.Rectangle
@@ -26,7 +26,7 @@ export class Building implements Damageable {
   private readonly shieldFront: Phaser.GameObjects.Rectangle
   private lastDamagedAt = -100000
   private readonly selection: Phaser.GameObjects.Ellipse
-  /** Uniform scale factor `setDisplaySize` computed for this building's atlas frame. Later scale tweens (spawn/recoil) must multiply against this instead of using absolute scale values, since the atlas frames are untrimmed 512px canvases far larger than any building's configured display size. */
+  /** Uniform scale factor `setDisplaySize` computed for this building's atlas frame. Later scale tweens (spawn/recoil) must multiply against this instead of using absolute scale values: the art pipeline rasterises each frame at the building's configured `spriteSize` times a 2x supersample for zoom/HiDPI headroom, so `baseScale` sits near 0.5 rather than 1, and an absolute target would snap the sprite to twice its intended size. */
   private baseScale = 1
   lastShotAt = 0
   rallyPoint: Phaser.Math.Vector2 | null = null
@@ -47,9 +47,12 @@ export class Building implements Damageable {
     this.size = stats.size
 
     const frame = buildingAtlasFrame(kind, faction)
-    const shadowWidth = stats.size * 1.08
-    const shadowHeight = stats.size * 0.42
-    this.shadow = scene.add.ellipse(x, y + stats.size * 0.26, shadowWidth, shadowHeight, 0x040505, 0.34)
+    // The contact shadow is baked from this building's own alpha silhouette on
+    // a canvas the same size as the colour frame, with the drop offset already
+    // applied, so it lines up simply by sharing the body's position and display
+    // size. It is deliberately not lit — it is an occlusion layer, not a surface.
+    this.shadow = scene.add.image(x, y, 'buildings-shadow', `${frame}_shadow`)
+      .setDisplaySize(stats.spriteSize.width, stats.spriteSize.height)
     this.glow = scene.add.image(x, y, 'buildings', frame).setDisplaySize(stats.spriteSize.width, stats.spriteSize.height).setAlpha(0.20)
     this.body = scene.add.image(x, y, 'buildings', frame).setDisplaySize(stats.spriteSize.width, stats.spriteSize.height).setLighting(true)
     this.glow.setTint(team === 'player' ? 0x6bfff2 : 0xaa63ff)
@@ -90,7 +93,7 @@ export class Building implements Damageable {
   }
 
   toSelectedEntity(): SelectedEntity {
-    return { id: this.id, label: buildingLabel(this.kind, this.faction), kind: this.kind, hp: Math.max(0, Math.round(this.hp)), maxHp: this.maxHp, shield: this.maxShield > 0 ? Math.round(this.shield) : undefined, maxShield: this.maxShield > 0 ? this.maxShield : undefined, team: this.team }
+    return { id: this.id, label: buildingLabel(this.kind, this.faction), kind: this.kind, hp: Math.max(0, Math.round(this.hp)), maxHp: this.maxHp, shield: this.maxShield > 0 ? Math.round(this.shield) : undefined, maxShield: this.maxShield > 0 ? this.maxShield : undefined, team: this.team, faction: this.faction }
   }
 
   takeDamage(amount: number): void {
@@ -143,7 +146,7 @@ export class Building implements Damageable {
 
   private syncGraphics(): void {
     const depth = 120 + this.y * 0.1
-    this.shadow.setPosition(this.x, this.y + this.size * 0.26).setDepth(depth - 2)
+    this.shadow.setPosition(this.x, this.y).setDepth(depth - 2)
     this.glow.setPosition(this.x, this.y).setDepth(depth - 1)
     this.body.setPosition(this.x, this.y).setDepth(depth)
     this.selection.setPosition(this.x, this.y + this.size * 0.22).setDepth(depth - 3)

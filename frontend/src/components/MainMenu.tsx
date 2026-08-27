@@ -1,9 +1,20 @@
 import { DIFFICULTY_DATA, FACTION_DATA } from '../game/config'
-import type { Difficulty, Faction, Mission } from '../types'
+import type { Difficulty, Faction, Mission, SaveGame } from '../types'
 import { useGameStore } from '../store/gameStore'
 
 const factions = Object.keys(FACTION_DATA) as Faction[]
 const difficulties = Object.keys(DIFFICULTY_DATA) as Difficulty[]
+
+const relativeTime = (iso: string) => {
+  const then = Date.parse(iso)
+  if (Number.isNaN(then)) return 'unknown'
+  const minutes = Math.max(0, Math.round((Date.now() - then) / 60000))
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.round(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.round(hours / 24)}d ago`
+}
 
 export function MainMenu({
   missions,
@@ -11,10 +22,12 @@ export function MainMenu({
   playerFaction,
   enemyFaction,
   difficulty,
+  saves,
   onMissionChange,
   onPlayerFactionChange,
   onEnemyFactionChange,
   onDifficultyChange,
+  onRestore,
   onStart,
 }: {
   missions: Mission[]
@@ -22,10 +35,12 @@ export function MainMenu({
   playerFaction: Faction
   enemyFaction: Faction
   difficulty: Difficulty
+  saves: SaveGame[]
   onMissionChange: (value: string) => void
   onPlayerFactionChange: (value: Faction) => void
   onEnemyFactionChange: (value: Faction) => void
   onDifficultyChange: (value: Difficulty) => void
+  onRestore: (save: SaveGame) => void
   onStart: () => void
 }) {
   const mission = missions.find((item) => item.id === missionId) ?? missions[0]
@@ -101,6 +116,35 @@ export function MainMenu({
           </div>
           <button className="deploy-button" disabled={!mission} onClick={onStart}>DEPLOY FORCES</button>
         </footer>
+
+        {saves.length > 0 && (
+          <section className="save-log">
+            <div className="menu-section-title compact"><span>05</span><strong>Deployment log</strong></div>
+            <p className="muted">
+              Saved slots record the matchup and economy at the moment you saved. Restoring one
+              reloads that matchup for a fresh deployment — mid-battle state is not yet persisted.
+            </p>
+            <ul>
+              {saves.map((save) => {
+                const savedMission = missions.find((item) => item.id === save.mission_id)
+                return (
+                  <li key={save.slot}>
+                    <button onClick={() => onRestore(save)}>
+                      <strong>{save.slot.toUpperCase()}</strong>
+                      <span>{savedMission?.name ?? save.mission_id}</span>
+                      <span>
+                        {FACTION_DATA[save.payload.faction].shortName} vs {FACTION_DATA[save.payload.enemy_faction].shortName}
+                        {' · '}{DIFFICULTY_DATA[save.payload.difficulty].label}
+                        {' · '}${save.payload.credits.toLocaleString()}
+                      </span>
+                      <small>{relativeTime(save.updated_at)}</small>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
+        )}
       </section>
     </main>
   )

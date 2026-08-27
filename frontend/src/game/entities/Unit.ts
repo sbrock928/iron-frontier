@@ -8,6 +8,14 @@ type HarvestState = 'seeking' | 'harvesting' | 'returning'
 /** Turret rotation lerp factor applied per frame when tracking a target. */
 const TURRET_TURN_RATE = 8
 
+/**
+ * Extra downward offset applied to a flying unit's contact shadow, in world
+ * pixels, so the gap between the aircraft and its shadow reads as altitude.
+ * Ground units sit directly on their shadow (the drop offset is already baked
+ * into the shadow texture) and so use no additional offset.
+ */
+const SHADOW_FLYER_DROP = 26
+
 function footprintFor(kind: UnitKind): number {
   const stats = UNIT_STATS[kind]
   if (stats.role === 'air' || stats.role === 'worker') return 52
@@ -35,7 +43,7 @@ export class Unit implements Damageable {
   y: number
   readonly body: Phaser.GameObjects.Sprite
   private readonly turret: Phaser.GameObjects.Sprite | null
-  private readonly shadow: Phaser.GameObjects.Ellipse
+  private readonly shadow: Phaser.GameObjects.Image
   private readonly glow: Phaser.GameObjects.Image
   private readonly selection: Phaser.GameObjects.Ellipse
   private readonly healthBack: Phaser.GameObjects.Rectangle
@@ -44,7 +52,7 @@ export class Unit implements Damageable {
   private readonly shieldFront: Phaser.GameObjects.Rectangle
   private readonly spriteWidth: number
   private readonly spriteHeight: number
-  /** Uniform scale factor `setDisplaySize` computed for this unit's atlas frame. All later scale tweens (spawn/idle/walk/recoil) must multiply against this instead of using absolute scale values, since the atlas frames are untrimmed 512px canvases far larger than any unit's configured display size. */
+  /** Uniform scale factor `setDisplaySize` computed for this unit's atlas frame. All later scale tweens (spawn/idle/walk/recoil) must multiply against this instead of using absolute scale values: the art pipeline rasterises each frame at the unit's configured `spriteSize` times a 2x supersample for zoom/HiDPI headroom, so `baseScale` sits near 0.5 rather than 1, and an absolute target would snap the sprite to twice its intended size. */
   private baseScale = 1
   private path: Phaser.Math.Vector2[] = []
   attackTarget: Damageable | null = null
@@ -91,7 +99,13 @@ export class Unit implements Damageable {
     this.spriteHeight = stats.spriteSize.height
 
     const footprint = footprintFor(kind)
-    this.shadow = scene.add.ellipse(x, y + (stats.isFlying ? 26 : 14), footprint + 24, footprint * 0.82, 0x020403, stats.isFlying ? 0.22 : 0.42)
+    // Silhouette-matched contact shadow baked by the art pipeline onto a canvas
+    // the same size as the colour frame, so it registers by sharing the body's
+    // position and display size. Flyers cast theirs further down and fainter to
+    // read as altitude. It is never lit — it is an occlusion layer, not a surface.
+    this.shadow = scene.add.image(x, y + (stats.isFlying ? SHADOW_FLYER_DROP : 0), 'units-shadow', `${unitAtlasFrame(kind)}_shadow`)
+      .setDisplaySize(this.spriteWidth, this.spriteHeight)
+      .setAlpha(stats.isFlying ? 0.5 : 1)
     this.glow = scene.add.image(x, y, 'units', unitAtlasFrame(kind)).setDisplaySize(this.spriteWidth, this.spriteHeight).setAlpha(this.maxShield > 0 ? 0.23 : 0.16)
     this.body = scene.add.sprite(x, y, 'units', unitAtlasFrame(kind)).setDisplaySize(this.spriteWidth, this.spriteHeight).setLighting(true)
     this.turret = hasTurret(kind)
@@ -382,7 +396,7 @@ export class Unit implements Damageable {
   private syncGraphics(): void {
     const lift = this.isFlying ? -18 : 0
     const baseDepth = 200 + this.y * 0.1 + (this.isFlying ? 120 : 0)
-    this.shadow.setPosition(this.x, this.y + (this.isFlying ? 28 : 14)).setDepth(baseDepth - 3)
+    this.shadow.setPosition(this.x, this.y + (this.isFlying ? SHADOW_FLYER_DROP : 0)).setDepth(baseDepth - 3)
     this.glow.setPosition(this.x, this.y + lift).setDepth(baseDepth - 1)
     this.body.setPosition(this.x, this.y + lift).setDepth(baseDepth)
     this.turret?.setPosition(this.x, this.y + lift).setDepth(baseDepth + 1)

@@ -1,5 +1,5 @@
 {
-  "$comment": "Terrain tiles must tile seamlessly on all four edges (enforced by process.ts wrap-around trim) and carry no directional lighting gradient, since AnimationSystem/drawTerrain blends multiple variants with a noise mask. Effects are greyscale/white only so they can be tinted per team at runtime.",
+  "$comment": "Terrain tiles must tile seamlessly on all four edges and carry no directional lighting gradient, since BattleScene.drawTerrain blends multiple variants across the tile grid and the scene applies its own directional light rig. Effects are greyscale/white only so they can be tinted per team at runtime.",
   "terrain": {
     "ground_base": {
       "seed": 300101,

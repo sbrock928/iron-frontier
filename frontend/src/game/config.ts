@@ -249,6 +249,37 @@ export const ALL_UNIT_KINDS = Object.keys(UNIT_STATS) as UnitKind[]
 export const ALL_BUILDING_KINDS: BuildingKind[] = ['conyard', 'power', 'refinery', 'barracks', 'warfactory', 'airfield', 'techlab', 'turret', 'detector']
 export const WORKER_KINDS = new Set<UnitKind>(['harvester', 'drone', 'probe'])
 
+export type AbilityDefinition = {
+  key: AbilityKey
+  faction: Faction
+  label: string
+  description: string
+  /**
+   * Unit kinds that can use the ability. An empty list means the ability
+   * applies to any selection belonging to the faction.
+   */
+  requiresKinds: UnitKind[]
+}
+
+/**
+ * Faction abilities offered on the command card. Declared as data so the card
+ * can render and enable/disable them generically; previously this mapping lived
+ * as hardcoded JSX branches in the old command panel, where the enabling rules
+ * were invisible to everything else in the codebase.
+ */
+export const ABILITY_DEFS: AbilityDefinition[] = [
+  { key: 'stim', faction: 'aegis', label: 'Stim Burst', description: 'Temporary attack and movement boost for front-line infantry.', requiresKinds: ['rifleman', 'marauder'] },
+  { key: 'siege', faction: 'aegis', label: 'Toggle Siege', description: 'Anchor artillery for greatly increased range.', requiresKinds: ['artillery'] },
+  { key: 'afterburners', faction: 'aegis', label: 'Afterburners', description: 'Burst of speed for aircraft.', requiresKinds: ['gunship', 'interceptor'] },
+  { key: 'frenzy', faction: 'noctis', label: 'Brood Frenzy', description: 'Drives melee organisms into a temporary rage.', requiresKinds: ['skitter', 'brute', 'ravager'] },
+  { key: 'acid_burst', faction: 'noctis', label: 'Acid Surge', description: 'Corrosive volley from ranged organisms.', requiresKinds: ['spitter', 'broodcaster'] },
+  { key: 'phase', faction: 'noctis', label: 'Phase Veil', description: 'Briefly cloaks flying organisms.', requiresKinds: ['wraith', 'devourer'] },
+  { key: 'shield_surge', faction: 'veyra', label: 'Shield Surge', description: 'Immediately restores shields across the selection.', requiresKinds: [] },
+  { key: 'phase_stride', faction: 'veyra', label: 'Phase Stride', description: 'Short-range blink for disciples.', requiresKinds: ['lancer', 'adept', 'seer'] },
+  { key: 'overcharge', faction: 'veyra', label: 'Overcharge', description: 'Amplifies the weapons of heavy constructs.', requiresKinds: ['sentinel', 'colossus', 'seraph', 'arbiter'] },
+]
+
+
 export const UI_ICONS: Record<UnitKind | BuildingKind, string> = {
   conyard: '/assets/ui/conyard_icon.png', power: '/assets/ui/power_icon.png', refinery: '/assets/ui/refinery_icon.png', barracks: '/assets/ui/barracks_icon.png', warfactory: '/assets/ui/warfactory_icon.png', airfield: '/assets/ui/airfield_icon.png', techlab: '/assets/ui/techlab_icon.png', turret: '/assets/ui/turret_icon.png', detector: '/assets/ui/detector_icon.png',
   rifleman: '/assets/ui/rifleman_icon.png', medic: '/assets/ui/medic_icon.png', marauder: '/assets/ui/marauder_icon.png', sniper: '/assets/ui/sniper_icon.png', tank: '/assets/ui/tank_icon.png', artillery: '/assets/ui/artillery_icon.png', walker: '/assets/ui/walker_icon.png', gunship: '/assets/ui/gunship_icon.png', interceptor: '/assets/ui/interceptor_icon.png', harvester: '/assets/ui/harvester_icon.png',
@@ -257,6 +288,18 @@ export const UI_ICONS: Record<UnitKind | BuildingKind, string> = {
 }
 
 export const PORTRAITS: Record<UnitKind, string> = Object.fromEntries(ALL_UNIT_KINDS.map((kind) => [kind, `/assets/portraits/${kind}.png`])) as Record<UnitKind, string>
+
+/**
+ * Best available artwork for an entity in the HUD: a full portrait where one
+ * exists (units), otherwise the command icon (structures). Structure kinds are
+ * shared across factions, so the faction — when the caller knows it — selects
+ * the right racial variant of the icon.
+ */
+export function portraitFor(entity: { kind: UnitKind | BuildingKind; faction?: Faction }): string {
+  if (entity.kind in PORTRAITS) return PORTRAITS[entity.kind as UnitKind]
+  const kind = entity.kind as BuildingKind
+  return entity.faction ? factionBuildingIcon(kind, entity.faction) : UI_ICONS[kind]
+}
 export const TEAM_TINT = { player: 0xe9f8f6, enemy: 0xffe7e7 } as const
 
 /**

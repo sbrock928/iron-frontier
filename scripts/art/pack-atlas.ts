@@ -5,15 +5,27 @@
  * atlas per category and writes {category}.png + {category}.json to
  * frontend/public/assets/atlas/, in Phaser 3's multi-atlas JSON format.
  *
- * Replacing ~180 individual loose-file HTTP requests (see BootScene's
- * `preload()`) with four atlas requests is the point: fewer round trips, and
- * a single draw-call-friendly texture per category instead of one texture
- * object per unit/building kind.
+ * Replacing ~180 individual loose-file HTTP requests with four atlas requests
+ * is the point: fewer round trips, and a single draw-call-friendly texture per
+ * category instead of one texture object per unit/building kind.
  *
- * Normal maps (`_n.png`) are intentionally left out of the colour atlas and
- * packed into a parallel `{category}-normal` atlas, since Phaser's Light2D
- * pipeline expects normal maps as their own texture keyed by convention
- * (`${key}_n`) rather than interleaved frames.
+ * Companion layers produced by process-art.ts are packed into their own
+ * parallel atlases rather than being interleaved as extra frames in the colour
+ * atlas:
+ *
+ *   - `_n.png`      -> `{category}-normal`
+ *   - `_shadow.png` -> `{category}-shadow`
+ *
+ * For normal maps this separation is load-bearing in two ways. Phaser's
+ * lighting pipeline wants the normal map as its own texture (bound via
+ * `setDataSource`) rather than as sibling frames, and because it samples the
+ * normal texture using the *colour* frame's UVs, the normal atlas must have a
+ * byte-identical layout to its colour atlas. That holds only because both are
+ * packed from the same number of same-sized images whose names sort the same
+ * way (the `_n` suffix is uniform), with `allowRotation` and `allowTrim` off
+ * and `detectIdentical` off so no frame is reordered, rotated or deduplicated.
+ * Adding a layer suffix to the colour atlas would silently desynchronise that
+ * layout and every lit sprite would sample the wrong normals.
  */
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -23,6 +35,20 @@ import type { PackerExporterType } from 'free-tex-packer-core'
 import { ATLAS_OUT_DIR, BUILD_DIR, log } from './shared.ts'
 
 const CATEGORIES = ['units', 'buildings', 'terrain', 'effects']
+
+/**
+ * Filename suffixes that mark a companion layer. A processed `.png` that ends
+ * with none of these is a colour frame. Keep this in sync with the layers
+ * process-art.ts emits, or new layers will leak into the colour atlas.
+ */
+const LAYER_SUFFIXES = ['_n', '_shadow'] as const
+type LayerSuffix = (typeof LAYER_SUFFIXES)[number]
+
+/** Atlas name suffix each companion layer is packed under. */
+const LAYER_ATLAS_SUFFIX: Record<LayerSuffix, string> = {
+  _n: 'normal',
+  _shadow: 'shadow',
+}
 
 interface PackerInputImage {
   path: string
@@ -53,7 +79,7 @@ function pack(images: PackerInputImage[], textureName: string): Promise<PackedFi
   }) as Promise<PackedFile[]>
 }
 
-async function loadCategoryImages(category: string, suffix: '' | '_n'): Promise<PackerInputImage[]> {
+async function loadCategoryImages(category: string, layer: LayerSuffix | null): Promise<PackerInputImage[]> {
   const dir = path.join(BUILD_DIR, category)
   let entries: string[]
   try {
@@ -62,9 +88,17 @@ async function loadCategoryImages(category: string, suffix: '' | '_n'): Promise<
     return []
   }
 
-  const matches = entries.filter((entry) =>
-    suffix === '' ? entry.endsWith('.png') && !entry.endsWith('_n.png') : entry.endsWith('_n.png'),
-  )
+  const matches = entries.filter((entry) => {
+    if (!entry.endsWith('.png')) return false
+    const base = entry.slice(0, -'.png'.length)
+    const matched = LAYER_SUFFIXES.find((suffix) => base.endsWith(suffix)) ?? null
+    return matched === layer
+  })
+
+  // free-tex-packer's ordering is derived from input order, so sort explicitly
+  // rather than relying on readdir order to keep packs reproducible across
+  // machines and to preserve colour/normal atlas layout parity.
+  matches.sort()
 
   return Promise.all(
     matches.map(async (fileName) => ({
@@ -75,7 +109,7 @@ async function loadCategoryImages(category: string, suffix: '' | '_n'): Promise<
 }
 
 async function packCategory(category: string): Promise<void> {
-  const colorImages = await loadCategoryImages(category, '')
+  const colorImages = await loadCategoryImages(category, null)
   if (colorImages.length === 0) {
     log(`skipping ${category}: no processed textures yet (run npm run art:gen && npm run art:process first)`)
     return
@@ -85,11 +119,12 @@ async function packCategory(category: string): Promise<void> {
   await writePackedFiles(packedColor)
   log(`packed ${category}: ${colorImages.length} frame(s)`)
 
-  const normalImages = await loadCategoryImages(category, '_n')
-  if (normalImages.length > 0) {
-    const packedNormal = await pack(normalImages, `${category}-normal`)
-    await writePackedFiles(packedNormal)
-    log(`packed ${category}-normal: ${normalImages.length} frame(s)`)
+  for (const layer of LAYER_SUFFIXES) {
+    const images = await loadCategoryImages(category, layer)
+    if (images.length === 0) continue
+    const atlasName = `${category}-${LAYER_ATLAS_SUFFIX[layer]}`
+    await writePackedFiles(await pack(images, atlasName))
+    log(`packed ${atlasName}: ${images.length} frame(s)`)
   }
 }
 

@@ -1,4 +1,4 @@
-import type { Mission } from '../types'
+import type { Mission, SaveGame, SaveGamePayload } from '../types'
 
 const API_ROOT = '/api/v1'
 
@@ -16,15 +16,15 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const getMission = (id = 'mission_01') => api<Mission>(`/missions/${id}`)
 
-export async function saveGame(
-  slot: string,
-  missionId: string,
-  payload: Record<string, unknown>,
-): Promise<void> {
+export async function saveGame(slot: string, missionId: string, payload: SaveGamePayload): Promise<void> {
   await api(`/saves/${encodeURIComponent(slot)}`, {
     method: 'PUT',
     body: JSON.stringify({ mission_id: missionId, payload }),
   })
 }
+
+export const listSaves = () => api<SaveGame[]>('/saves')
+
+export const getSave = (slot: string) => api<SaveGame>(`/saves/${encodeURIComponent(slot)}`)
 
 export const getMissions = () => api<Mission[]>('/missions')

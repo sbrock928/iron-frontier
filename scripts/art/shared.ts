@@ -5,6 +5,7 @@
  */
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { BUILDING_STATS, UNIT_STATS } from '../../frontend/src/game/config.ts'
 
 export const ART_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'art')
 export const SRC_DIR = path.join(ART_ROOT, 'src')
@@ -27,6 +28,64 @@ export const FACTION_ACCENT: Record<Faction, string> = {
   aegis: '#66e8dd',
   noctis: '#c684ff',
   veyra: '#e5b6ff',
+}
+
+/**
+ * Supersampling factor applied on top of each asset's configured `spriteSize`
+ * when rasterising to art/build. The game always calls `setDisplaySize()` at
+ * its configured size, so the texture only needs enough headroom to stay crisp
+ * at the maximum camera zoom (1.35) on a HiDPI display. 2x covers both with
+ * margin; going to 1x would visibly blur when zoomed in, and the old flat
+ * 512px canvas wasted 25-90x the pixels an infantry sprite actually needs.
+ */
+export const TARGET_SCALE = 2
+
+/** Fixed raster sizes for categories that have no per-asset `spriteSize` in the game config. */
+const FIXED_CATEGORY_SIZE: Record<string, number> = {
+  terrain: 512,
+  effects: 256,
+}
+
+const TURRET_SUFFIX = '_turret'
+
+/**
+ * Splits a building asset basename into its faction and kind. Aegis is the
+ * unprefixed default, matching `buildingAtlasFrame()` in the game config —
+ * `conyard` is Aegis, `noctis_conyard` is the Noctis variant.
+ */
+export function parseBuildingName(name: string): { faction: Faction; kind: string } {
+  for (const faction of FACTIONS) {
+    if (faction !== 'aegis' && name.startsWith(`${faction}_`)) {
+      return { faction, kind: name.slice(faction.length + 1) }
+    }
+  }
+  return { faction: 'aegis', kind: name }
+}
+
+/**
+ * Square raster edge, in pixels, for a processed asset. Units and buildings are
+ * derived from the `spriteSize` the game actually renders them at (times
+ * TARGET_SCALE); a unit's turret layer inherits its hull's size so the two
+ * layers stay registered when drawn on top of each other.
+ */
+export function targetSizeFor(category: string, name: string): number {
+  if (category === 'units') {
+    const kind = name.endsWith(TURRET_SUFFIX) ? name.slice(0, -TURRET_SUFFIX.length) : name
+    const stats = UNIT_STATS[kind as keyof typeof UNIT_STATS]
+    if (!stats) throw new Error(`No UNIT_STATS entry for "${kind}" (asset units/${name}.png)`)
+    return Math.ceil((Math.max(stats.spriteSize.width, stats.spriteSize.height) * TARGET_SCALE) / 2) * 2
+  }
+
+  if (category === 'buildings') {
+    const { kind } = parseBuildingName(name)
+    const stats = BUILDING_STATS[kind as keyof typeof BUILDING_STATS]
+    if (!stats) throw new Error(`No BUILDING_STATS entry for "${kind}" (asset buildings/${name}.png)`)
+    return Math.ceil((Math.max(stats.spriteSize.width, stats.spriteSize.height) * TARGET_SCALE) / 2) * 2
+  }
+
+  const fixed = FIXED_CATEGORY_SIZE[category]
+  if (!fixed) throw new Error(`Unknown art category "${category}"`)
+  return fixed
 }
 
 /**
