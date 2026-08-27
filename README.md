@@ -1,6 +1,6 @@
 # Iron Frontier
 
-A small Command & Conquer-inspired real-time strategy game built as a production-style monorepo.
+An original three-faction science-fiction real-time strategy game built as a production-style React/Phaser + FastAPI monorepo.
 
 ## Stack
 
@@ -342,3 +342,80 @@ The enemy no longer receives free scripted attack-wave units. It now:
 - respects its power grid and builds additional power when overloaded
 - escalates its unit composition over the course of the match
 - launches attacks using units it actually owns
+
+
+## Three-faction expansion + main menu
+
+The game now opens to a real pre-match command screen instead of immediately constructing a Phaser battle. From the main menu you can choose:
+
+- scenario / skirmish map
+- player faction
+- enemy faction (mirror matches are supported)
+- AI difficulty: Cadet, Standard, Veteran, or Extermination
+
+The selected difficulty changes AI starting credits, harvesting efficiency, production speed, attack cadence, and starting army strength.
+
+### Playable factions
+
+#### Aegis Expeditionary
+Industrial combined arms with conventional infantry, armor, artillery, aircraft, healing support, and mature logistics.
+
+Roster: Rifleman, Field Medic, Marauder, Specter Sniper, Medium Tank, Siege Artillery, Goliath Walker, Gunship, Valkyrie Interceptor, Harvester.
+
+Structures: Construction Yard, Fusion Reactor, Refinery, Barracks, War Factory, Flight Control, Science Directorate, Guard Turret, Sensor Array.
+
+Nine faction-specific research options cover armor, targeting, economy, precision infantry, siege systems, heavy armor, air technology, interceptors, and medical support.
+
+#### Noctis Brood
+Fast biological warfare built around mutation, regeneration/support, heavy organisms, and predatory air units.
+
+Roster: Skitter Drone, Spitter Beast, Brood Caster, Brute Mauler, Ravager Strain, Wraith Flier, Devourer, Extractor Drone.
+
+Structures: Hive Yard, Spore Reactor, Biomass Processor, Spawn Pit, Gene Forge, Sky Nest, Cerebral Nexus, Spine Cannon, Seer Node.
+
+Nine evolution paths cover carapace armor, attack speed, economy, acid weapons, support organisms, heavy strains, Ravagers, phase fliers, and Devourers.
+
+#### Veyra Ascendancy
+An original high-tech psionic/crystal faction inspired by the *archetype* of expensive elite sci-fi armies: fewer but stronger units, regenerating energy shields, precision weapons, advanced air power, and phase abilities. It does not use franchise artwork or named characters.
+
+Roster: Lancer, Resonant Adept, Oracle Seer, Sentinel Walker, Prism Titan, Seraph Fighter, Concord Sphere, Crystal Probe.
+
+Structures: Nexus Core, Flux Pylon, Crystal Assimilator, Disciple Gate, Forge Sanctum, Star Portal, Archive Spire, Prism Battery, Oracle Beacon.
+
+Nine Ascension technologies cover shield regeneration, weapon resonance, crystal economy, phase movement, support/detection, heavy constructs, titan-class units, advanced fighters, and late-game command craft.
+
+Veyra units and structures have regenerating shields in addition to normal hit points. Seers can restore allied shields and the faction has Shield Surge, Phase Stride, and Resonance Overcharge tactical abilities.
+
+### Expanded production model
+
+Production is now separated into infantry, ground/heavy, and air structures rather than forcing every unit through two factories. Each production structure has its own FIFO queue, live percentage/progress bar, queued count, cancellation/refund handling, and rally point. Rally points work for infantry, ground, and air-production structures.
+
+Research uses real timed queues with prerequisites, costs, required structures, live progress bars, and unit unlocks. Tier 2/3 units cannot simply be purchased before their corresponding technology is completed.
+
+### Additional battlefield systems retained
+
+- functional workers for all three factions
+- finite resource fields and refinery income
+- real enemy economy / production rather than free scripted unit spawns
+- attack-move
+- control groups 1–9
+- local unit avoidance
+- A* ground pathfinding and direct air navigation
+- fog of war
+- air/ground targeting rules
+- healing and shield-support systems
+- unit abilities
+- base-building AI
+- production queues and research queues
+- rally points
+- multiple missions and skirmish maps
+
+### Windows development note
+
+Vite now proxies the backend explicitly through `127.0.0.1` rather than `localhost`:
+
+```text
+http://127.0.0.1:8000
+```
+
+This avoids the Windows/Node case where `localhost` resolves to IPv6 `::1` while Uvicorn is listening on IPv4 `127.0.0.1`.

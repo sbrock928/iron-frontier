@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
-import type { BuildingKind, Faction, Mission, UnitKind, UpgradeKey } from '../../types'
+import type { BuildingKind, Difficulty, Faction, Mission, UnitKind, UpgradeKey } from '../../types'
 import { useGameStore } from '../../store/gameStore'
-import { BUILDING_STATS, BUILDING_TEXTURES, FACTION_DATA, UNIT_STATS, UPGRADE_DEFS, buildingLabel, isUnitUnlocked, opposingFaction } from '../config'
+import { ALL_BUILDING_KINDS, ALL_UNIT_KINDS, BUILDING_STATS, BUILDING_TEXTURES, DIFFICULTY_DATA, FACTION_DATA, UNIT_STATS, UPGRADE_DEFS, buildingLabel, isUnitUnlocked } from '../config'
 import { Building } from '../entities/Building'
 import type { Damageable } from '../entities/Damageable'
 import { ResourcePatch } from '../entities/ResourcePatch'
@@ -21,6 +21,7 @@ export class BattleScene extends Phaser.Scene {
   private readonly mission: Mission
   private readonly playerFaction: Faction
   private readonly enemyFaction: Faction
+  private readonly difficulty: Difficulty
   private units: Unit[] = []
   private buildings: Building[] = []
   private patches: ResourcePatch[] = []
@@ -61,11 +62,12 @@ export class BattleScene extends Phaser.Scene {
   private audioStarted = false
   private ambientSound: Phaser.Sound.BaseSound | null = null
 
-  constructor(mission: Mission, faction: Faction) {
+  constructor(mission: Mission, faction: Faction, enemyFaction: Faction, difficulty: Difficulty) {
     super({ key: 'BattleScene' })
     this.mission = mission
     this.playerFaction = faction
-    this.enemyFaction = opposingFaction(faction)
+    this.enemyFaction = enemyFaction
+    this.difficulty = difficulty
   }
 
   preload(): void {
@@ -76,27 +78,15 @@ export class BattleScene extends Phaser.Scene {
     this.load.image('fx-explosion', 'assets/effects/explosion.png')
     this.load.image('fx-muzzle', 'assets/effects/muzzle.png')
 
-    const unitImages = ['rifleman', 'medic', 'marauder', 'tank', 'artillery', 'gunship', 'harvester', 'skitter', 'brute', 'spitter', 'wraith', 'drone']
-    for (const key of unitImages) {
+    for (const key of ALL_UNIT_KINDS) {
       this.load.image(`unit-${key}`, `assets/units/${key}.png`)
+      this.load.spritesheet(`unit-${key}-sheet`, `assets/units/${key}_sheet.png`, { frameWidth: 256, frameHeight: 256 })
     }
-    this.load.spritesheet('unit-rifleman-sheet', 'assets/units/rifleman_sheet.png', { frameWidth: 256, frameHeight: 256 })
-    this.load.spritesheet('unit-medic-sheet', 'assets/units/medic_sheet.png', { frameWidth: 256, frameHeight: 256 })
-    this.load.spritesheet('unit-marauder-sheet', 'assets/units/marauder_sheet.png', { frameWidth: 256, frameHeight: 256 })
-    this.load.spritesheet('unit-tank-sheet', 'assets/units/tank_sheet.png', { frameWidth: 256, frameHeight: 256 })
-    this.load.spritesheet('unit-artillery-sheet', 'assets/units/artillery_sheet.png', { frameWidth: 256, frameHeight: 256 })
-    this.load.spritesheet('unit-harvester-sheet', 'assets/units/harvester_sheet.png', { frameWidth: 256, frameHeight: 256 })
-    this.load.spritesheet('unit-gunship-sheet', 'assets/units/gunship_sheet.png', { frameWidth: 256, frameHeight: 256 })
-    this.load.spritesheet('unit-skitter-sheet', 'assets/units/skitter_sheet.png', { frameWidth: 256, frameHeight: 256 })
-    this.load.spritesheet('unit-brute-sheet', 'assets/units/brute_sheet.png', { frameWidth: 256, frameHeight: 256 })
-    this.load.spritesheet('unit-spitter-sheet', 'assets/units/spitter_sheet.png', { frameWidth: 256, frameHeight: 256 })
-    this.load.spritesheet('unit-wraith-sheet', 'assets/units/wraith_sheet.png', { frameWidth: 256, frameHeight: 256 })
-    this.load.spritesheet('unit-drone-sheet', 'assets/units/drone_sheet.png', { frameWidth: 256, frameHeight: 256 })
 
-    const buildings = ['conyard', 'power', 'refinery', 'barracks', 'warfactory', 'turret']
-    for (const key of buildings) {
+    for (const key of ALL_BUILDING_KINDS) {
       this.load.image(`building-${key}`, `assets/buildings/${key}.png`)
       this.load.image(`building-alien-${key}`, `assets/buildings/alien_${key}.png`)
+      this.load.image(`building-veyra-${key}`, `assets/buildings/veyra_${key}.png`)
     }
 
     this.load.image('wreck-infantry', 'assets/wrecks/infantry.png')
@@ -131,7 +121,7 @@ export class BattleScene extends Phaser.Scene {
     this.enemyCompletedUpgrades.clear()
     this.controlGroups.clear()
     this.attackMoveArmed = false
-    this.enemyCredits = 3600
+    this.enemyCredits = DIFFICULTY_DATA[this.difficulty].aiCredits
     this.enemyBuildAttempt = 0
     this.ambientSound?.stop()
     this.ambientSound = null
@@ -160,7 +150,7 @@ export class BattleScene extends Phaser.Scene {
     this.updateEnemyFogVisibility()
     this.enemyAI = new EnemyAI(
       this,
-      definition.enemy.attack_interval_seconds,
+      definition.enemy.attack_interval_seconds * DIFFICULTY_DATA[this.difficulty].aggression,
       this.enemyFaction,
       (kind) => this.queueEnemyUnit(kind),
       (kind) => this.tryEnemyBuild(kind),
@@ -177,6 +167,7 @@ export class BattleScene extends Phaser.Scene {
     if (useGameStore.getState().status !== 'playing') return
     this.panCamera(delta)
     for (const unit of this.units) unit.updateMovement(delta)
+    for (const building of this.buildings) building.updateShield(delta, time)
     this.avoidance.update(this.units)
     this.harvesting.update(delta, this.units, this.buildings, this.patches, (team, amount) => {
       if (team === 'player') this.credits += amount
@@ -184,7 +175,7 @@ export class BattleScene extends Phaser.Scene {
     }, (team) => this.harvestMultiplier(team))
     this.production.update(delta, (team) => this.productionSpeedMultiplier(team), (completion) => this.completeProduction(completion.building, completion.kind, completion.team))
     this.research.update(delta, (team) => this.productionSpeedMultiplier(team), (upgrade, team) => this.completeResearch(upgrade, team))
-    this.support.update(time, this.units)
+    this.support.update(time, this.units, (team, kind) => this.supportMultiplier(team, kind))
     this.fog.update(time, this.units, this.buildings)
     this.updateEnemyFogVisibility()
     this.combat.update(
@@ -260,11 +251,12 @@ export class BattleScene extends Phaser.Scene {
 
     this.spawnUnit(FACTION_DATA[this.enemyFaction].worker, 'enemy', enemy.x - 40, enemy.y - 210)
 
-    const enemyPattern: UnitKind[] = this.enemyFaction === 'aegis'
-      ? ['rifleman', 'marauder', 'tank']
-      : ['skitter', 'spitter']
-    for (let index = 0; index < this.mission.definition.enemy.starting_units; index += 1) {
-      const kind = enemyPattern[index % enemyPattern.length] ?? enemyPattern[0] ?? 'rifleman'
+    const enemyWorker = FACTION_DATA[this.enemyFaction].worker
+    const enemyPattern = FACTION_DATA[this.enemyFaction].startingUnits.filter((kind) => kind !== enemyWorker)
+    const difficultyUnitScale = this.difficulty === 'easy' ? 0.7 : this.difficulty === 'hard' ? 1.25 : this.difficulty === 'brutal' ? 1.5 : 1
+    const enemyStartingCount = Math.max(2, Math.round(this.mission.definition.enemy.starting_units * difficultyUnitScale))
+    for (let index = 0; index < enemyStartingCount; index += 1) {
+      const kind = enemyPattern[index % enemyPattern.length] ?? enemyPattern[0] ?? enemyWorker
       this.spawnUnit(kind, 'enemy', enemy.x - 260, enemy.y - 80 + index * 44)
     }
     this.patches = this.mission.definition.ore_fields.map((point) => new ResourcePatch(this, point.x, point.y))
@@ -513,7 +505,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private issueCommand(x: number, y: number): void {
-    if (this.selectedBuilding && (this.selectedBuilding.kind === 'barracks' || this.selectedBuilding.kind === 'warfactory')) {
+    if (this.selectedBuilding && ['barracks', 'warfactory', 'airfield'].includes(this.selectedBuilding.kind)) {
       this.selectedBuilding.setRallyPoint(x, y)
       useGameStore.getState().setStatus('playing', `${buildingLabel(this.selectedBuilding.kind, this.playerFaction)} rally point set.`)
       return
@@ -594,6 +586,9 @@ export class BattleScene extends Phaser.Scene {
     if (kind === 'power') return owns('conyard')
     if (kind === 'refinery' || kind === 'barracks') return owns('power')
     if (kind === 'warfactory' || kind === 'turret') return owns('refinery') && owns('power')
+    if (kind === 'techlab') return owns('barracks') && owns('refinery') && owns('power')
+    if (kind === 'airfield') return owns('warfactory') && owns('power')
+    if (kind === 'detector') return owns('techlab') && owns('power')
     return true
   }
 
@@ -651,7 +646,7 @@ export class BattleScene extends Phaser.Scene {
   private queueUnit(kind: UnitKind): void {
     this.startAudio()
     const stats = UNIT_STATS[kind]
-    const allowed = [...FACTION_DATA[this.playerFaction].infantry, ...FACTION_DATA[this.playerFaction].factory]
+    const allowed = [...FACTION_DATA[this.playerFaction].infantry, ...FACTION_DATA[this.playerFaction].factory, ...FACTION_DATA[this.playerFaction].air]
     if (!allowed.includes(kind)) {
       useGameStore.getState().setStatus('playing', `${stats.label} does not belong to ${FACTION_DATA[this.playerFaction].name}.`)
       return
@@ -743,7 +738,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private queueEnemyUnit(kind: UnitKind): boolean {
-    const allowed = [...FACTION_DATA[this.enemyFaction].infantry, ...FACTION_DATA[this.enemyFaction].factory]
+    const allowed = [...FACTION_DATA[this.enemyFaction].infantry, ...FACTION_DATA[this.enemyFaction].factory, ...FACTION_DATA[this.enemyFaction].air]
     if (!allowed.includes(kind)) return false
     const stats = UNIT_STATS[kind]
     const factories = this.buildings.filter((building) => building.alive && building.team === 'enemy' && building.kind === stats.requiredFactory)
@@ -807,24 +802,12 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private setupAnimations(): void {
-    const definitions: Array<{ kind: UnitKind; texture: string; rate: number }> = [
-      { kind: 'rifleman', texture: 'unit-rifleman-sheet', rate: 9 },
-      { kind: 'medic', texture: 'unit-medic-sheet', rate: 9 },
-      { kind: 'marauder', texture: 'unit-marauder-sheet', rate: 8 },
-      { kind: 'tank', texture: 'unit-tank-sheet', rate: 8 },
-      { kind: 'artillery', texture: 'unit-artillery-sheet', rate: 7 },
-      { kind: 'gunship', texture: 'unit-gunship-sheet', rate: 9 },
-      { kind: 'harvester', texture: 'unit-harvester-sheet', rate: 7 },
-      { kind: 'skitter', texture: 'unit-skitter-sheet', rate: 10 },
-      { kind: 'brute', texture: 'unit-brute-sheet', rate: 7 },
-      { kind: 'spitter', texture: 'unit-spitter-sheet', rate: 8 },
-      { kind: 'wraith', texture: 'unit-wraith-sheet', rate: 9 },
-      { kind: 'drone', texture: 'unit-drone-sheet', rate: 8 },
-    ]
-    for (const item of definitions) {
-      const key = `${item.kind}-move`
+    for (const kind of ALL_UNIT_KINDS) {
+      const key = `${kind}-move`
       if (this.anims.exists(key)) continue
-      this.anims.create({ key, frames: this.anims.generateFrameNumbers(item.texture, { start: 0, end: 3 }), frameRate: item.rate, repeat: -1 })
+      const role = UNIT_STATS[kind].role
+      const rate = role === 'air' ? 9 : role === 'infantry' || role === 'support' ? 9 : role === 'vehicle' ? 7 : 7
+      this.anims.create({ key, frames: this.anims.generateFrameNumbers(`unit-${kind}-sheet`, { start: 0, end: 3 }), frameRate: rate, repeat: -1 })
     }
   }
 
@@ -854,7 +837,7 @@ export class BattleScene extends Phaser.Scene {
     this.cameras.main.centerOn(x, y)
   }
 
-  private activateAbility(ability: 'stim' | 'siege' | 'afterburners' | 'frenzy' | 'acid_burst' | 'phase'): void {
+  private activateAbility(ability: 'stim' | 'siege' | 'afterburners' | 'frenzy' | 'acid_burst' | 'phase' | 'shield_surge' | 'phase_stride' | 'overcharge'): void {
     this.startAudio()
     const now = this.time.now
     let triggered = 0
@@ -865,15 +848,18 @@ export class BattleScene extends Phaser.Scene {
       if (ability === 'frenzy' && unit.activateFrenzy(now)) triggered += 1
       if (ability === 'acid_burst' && unit.activateAcidBurst(now)) triggered += 1
       if (ability === 'phase' && unit.activatePhase(now)) triggered += 1
+      if (ability === 'shield_surge' && unit.activateShieldSurge(now)) triggered += 1
+      if (ability === 'phase_stride' && unit.activatePhaseStride(now)) triggered += 1
+      if (ability === 'overcharge' && unit.activateOvercharge(now)) triggered += 1
     }
     if (triggered > 0) {
       this.sound.play('sfx-confirm', { volume: 0.18 })
-      const message = ability === 'stim' ? 'Stim Burst engaged.'
-        : ability === 'siege' ? 'Siege mode toggled.'
-          : ability === 'afterburners' ? 'Afterburners online.'
-            : ability === 'frenzy' ? 'Brood Frenzy unleashed.'
-              : ability === 'acid_burst' ? 'Acid Surge glands overpressurized.'
-                : 'Phase Veil engaged.'
+      const messages: Record<string, string> = {
+        stim: 'Stim Burst engaged.', siege: 'Siege mode toggled.', afterburners: 'Afterburners online.',
+        frenzy: 'Brood Frenzy unleashed.', acid_burst: 'Acid Surge glands overpressurized.', phase: 'Phase Veil engaged.',
+        shield_surge: 'Veyra shield lattice surged.', phase_stride: 'Phase Stride engaged.', overcharge: 'Resonance Overcharge active.',
+      }
+      const message = messages[ability] ?? 'Ability activated.'
       useGameStore.getState().setStatus('playing', message)
     }
   }
@@ -932,16 +918,26 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private productionSpeedMultiplier(team: 'player' | 'enemy'): number {
-    if (team === 'enemy') return Math.max(0.85, this.mission.definition.enemy.production_multiplier)
+    if (team === 'enemy') return Math.max(0.72, this.mission.definition.enemy.production_multiplier * DIFFICULTY_DATA[this.difficulty].production)
     if (this.playerFaction === 'aegis' && this.completedUpgrades.has('aegis_reactor_optimization')) return 1.18
     if (this.playerFaction === 'noctis' && this.completedUpgrades.has('noctis_metabolic_bloom')) return 1.18
+    if (this.playerFaction === 'veyra' && this.completedUpgrades.has('veyra_crystal_efficiency')) return 1.18
     return 1
   }
 
   private harvestMultiplier(team: 'player' | 'enemy'): number {
-    if (team === 'enemy') return 1
+    if (team === 'enemy') return DIFFICULTY_DATA[this.difficulty].economy
     if (this.playerFaction === 'aegis' && this.completedUpgrades.has('aegis_reactor_optimization')) return 1.15
     if (this.playerFaction === 'noctis' && this.completedUpgrades.has('noctis_metabolic_bloom')) return 1.15
+    if (this.playerFaction === 'veyra' && this.completedUpgrades.has('veyra_crystal_efficiency')) return 1.15
+    return 1
+  }
+
+  private supportMultiplier(team: 'player' | 'enemy', kind: UnitKind): number {
+    if (team === 'enemy') return 1
+    if (kind === 'medic' && this.completedUpgrades.has('aegis_nanomedicine')) return 1.35
+    if (kind === 'seer' && this.completedUpgrades.has('veyra_shield_harmonics')) return 1.25
+    if (kind === 'broodcaster' && this.completedUpgrades.has('noctis_brood_mind')) return 1.2
     return 1
   }
 
@@ -958,17 +954,25 @@ export class BattleScene extends Phaser.Scene {
     let visionBonus = 0
     let rangeBonus = 0
     let damageReduction = 0
+    let shieldRegen = 1
 
     if (faction === 'aegis') {
       if (upgrades.has('aegis_composite_plating')) damageReduction += 0.12
       if (upgrades.has('aegis_targeting_ai')) { damage *= 1.12; visionBonus += 30 }
+      if (upgrades.has('aegis_heavy_chassis') && UNIT_STATS[unit.kind].role === 'vehicle') damageReduction += 0.08
       if (upgrades.has('aegis_aerospace_command') && unit.isFlying) visionBonus += 60
-    } else {
+    } else if (faction === 'noctis') {
       if (upgrades.has('noctis_carapace_grafting')) damageReduction += 0.12
       if (upgrades.has('noctis_synaptic_acceleration')) { speed *= 1.12; cooldown *= 0.90 }
-      if (upgrades.has('noctis_acid_evolution') && unit.kind === 'spitter') { damage *= 1.20; rangeBonus += 35 }
+      if (upgrades.has('noctis_acid_evolution') && (unit.kind === 'spitter' || unit.kind === 'broodcaster')) { damage *= 1.20; rangeBonus += 35 }
+    } else {
+      if (upgrades.has('veyra_shield_harmonics')) shieldRegen *= 1.35
+      if (upgrades.has('veyra_resonance_matrix')) { damage *= 1.12; rangeBonus += 25 }
+      if (upgrades.has('veyra_phase_doctrine') && (unit.kind === 'lancer' || unit.kind === 'adept')) speed *= 1.15
+      if (upgrades.has('veyra_oracle_path') && unit.kind === 'seer') visionBonus += 120
+      if (upgrades.has('veyra_star_gate') && unit.isFlying) visionBonus += 50
     }
-    unit.applyUpgradeModifiers({ speed, damage, cooldown, visionBonus, rangeBonus, damageReduction })
+    unit.applyUpgradeModifiers({ speed, damage, cooldown, visionBonus, rangeBonus, damageReduction, shieldRegen })
   }
 
   private calculatePowerForTeam(team: 'player' | 'enemy'): { used: number; capacity: number } {

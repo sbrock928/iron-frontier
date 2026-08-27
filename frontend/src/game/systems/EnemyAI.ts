@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import type { BuildingKind, Faction, UnitKind } from '../../types'
-import { FACTION_DATA } from '../config'
+import { FACTION_DATA, UNIT_STATS } from '../config'
 import type { Building } from '../entities/Building'
 import type { Unit } from '../entities/Unit'
 
@@ -23,7 +23,7 @@ export class EnemyAI {
 
   update(time: number, units: Unit[], buildings: Building[]): void {
     if (time >= this.nextDecisionAt) {
-      this.nextDecisionAt = time + 1200
+      this.nextDecisionAt = time + 1050
       this.manageEconomy(time, units, buildings)
     }
     if (time < this.nextAttackAt) return
@@ -49,28 +49,34 @@ export class EnemyAI {
       return
     }
 
-    if (time > 35000 && enemyBuildings.filter((building) => building.kind === 'turret').length < 2) {
+    if (time > 30000 && enemyBuildings.filter((building) => building.kind === 'turret').length < 2) {
       if (this.tryBuild('turret')) return
     }
-    if (time > 70000 && enemyBuildings.filter((building) => building.kind === 'refinery').length < 2) {
+    if (time > 45000 && !enemyBuildings.some((building) => building.kind === 'techlab')) {
+      if (this.tryBuild('techlab')) return
+    }
+    if (time > 55000 && !enemyBuildings.some((building) => building.kind === 'airfield')) {
+      if (this.tryBuild('airfield')) return
+    }
+    if (time > 65000 && !enemyBuildings.some((building) => building.kind === 'detector')) {
+      if (this.tryBuild('detector')) return
+    }
+    if (time > 75000 && enemyBuildings.filter((building) => building.kind === 'refinery').length < 2) {
       if (this.tryBuild('refinery')) return
     }
 
-    const combatCount = enemyUnits.filter((unit) => unit.kind !== 'harvester' && unit.kind !== 'drone' && unit.kind !== 'medic').length
-    if (combatCount >= 26) return
-    const pattern: UnitKind[] = this.faction === 'noctis'
-      ? time < 60000
-        ? ['skitter', 'spitter', 'skitter']
-        : time < 120000
-          ? ['skitter', 'spitter', 'brute', 'skitter']
-          : ['skitter', 'spitter', 'brute', 'wraith']
-      : time < 60000
-        ? ['rifleman', 'marauder', 'rifleman']
-        : time < 120000
-          ? ['rifleman', 'marauder', 'tank', 'rifleman']
-          : ['rifleman', 'marauder', 'tank', 'artillery', 'gunship']
-    const pick = pattern[Math.floor(time / 1200) % pattern.length] ?? pattern[0] ?? 'rifleman'
-    this.queueUnit(pick)
+    const combatCount = enemyUnits.filter((unit) => UNIT_STATS[unit.kind].role !== 'worker' && UNIT_STATS[unit.kind].role !== 'support').length
+    if (combatCount >= 32) return
+    const pattern = this.patternForTime(time)
+    const pick = pattern[Math.floor(time / 1100) % pattern.length] ?? pattern[0]
+    if (pick) this.queueUnit(pick)
+  }
+
+  private patternForTime(time: number): UnitKind[] {
+    const data = FACTION_DATA[this.faction]
+    if (time < 50000) return data.infantry.slice(0, Math.min(2, data.infantry.length))
+    if (time < 100000) return [...data.infantry.slice(0, 3), ...data.factory.filter((kind) => UNIT_STATS[kind].role !== 'worker').slice(0, 2)]
+    return [...data.infantry, ...data.factory.filter((kind) => UNIT_STATS[kind].role !== 'worker'), ...data.air]
   }
 
   private launchAttack(units: Unit[], buildings: Building[]): void {
@@ -81,11 +87,11 @@ export class EnemyAI {
     this.wave += 1
     const available = units
       .filter((unit) => unit.alive && unit.team === 'enemy')
-      .filter((unit) => unit.kind !== 'harvester' && unit.kind !== 'drone' && unit.kind !== 'medic')
+      .filter((unit) => UNIT_STATS[unit.kind].role !== 'worker' && UNIT_STATS[unit.kind].role !== 'support')
       .filter((unit) => !unit.attackTarget)
-    const count = Math.min(12, 4 + Math.floor(this.wave / 2), available.length)
+    const count = Math.min(16, 5 + Math.floor(this.wave / 2), available.length)
     available.slice(0, count).forEach((unit, index) => {
-      this.scene.time.delayedCall(index * 120, () => {
+      this.scene.time.delayedCall(index * 110, () => {
         if (unit.alive && target.alive) unit.setAttackTarget(target)
       })
     })

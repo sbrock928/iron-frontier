@@ -1,11 +1,11 @@
-import { FACTION_DATA, opposingFaction } from '../game/config'
+import { FACTION_DATA } from '../game/config'
 import { useGameStore } from '../store/gameStore'
 
 export function TopBar() {
-  const { mission, credits, powerUsed, powerCapacity, faction } = useGameStore()
+  const { mission, credits, powerUsed, powerCapacity, faction, enemyFaction } = useGameStore()
   const lowPower = powerUsed > powerCapacity
   const friendly = FACTION_DATA[faction]
-  const hostile = FACTION_DATA[opposingFaction(faction)]
+  const hostile = FACTION_DATA[enemyFaction]
   return (
     <header className="topbar">
       <div className="brand">

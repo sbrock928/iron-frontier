@@ -1,9 +1,9 @@
 import type { BuildingKind, UnitKind } from '../types'
-import { BUILDING_STATS, FACTION_DATA, UI_ICONS, UNIT_STATS, buildingLabel, isUnitUnlocked } from '../game/config'
+import { ALL_BUILDING_KINDS, BUILDING_STATS, FACTION_DATA, UI_ICONS, UNIT_STATS, buildingLabel, factionBuildingIcon, isUnitUnlocked } from '../game/config'
 import { gameBus } from '../game/events/gameBus'
 import { useGameStore } from '../store/gameStore'
 
-const structures: BuildingKind[] = ['power', 'refinery', 'barracks', 'warfactory', 'turret']
+const structures: BuildingKind[] = ALL_BUILDING_KINDS.filter((kind) => kind !== 'conyard')
 
 function BuildButton({ icon, title, subtitle, active = false, disabled = false, onClick }: { icon: string; title: string; subtitle: string; active?: boolean; disabled?: boolean; onClick: () => void }) {
   return (
@@ -47,15 +47,17 @@ export function BuildPanel() {
           const item = BUILDING_STATS[kind]
           const active = placementKind === kind
           const title = buildingLabel(kind, faction)
-          return <BuildButton key={kind} icon={faction === 'noctis' ? `/assets/ui/alien_${kind}_icon.png` : UI_ICONS[kind]} title={active ? `PLACE ${title}` : title} subtitle={active ? 'CLICK MAP' : `$${item.cost.toLocaleString()}`} active={active} onClick={() => gameBus.emit('build-structure', kind)} />
+          return <BuildButton key={kind} icon={factionBuildingIcon(kind, faction)} title={active ? `PLACE ${title}` : title} subtitle={active ? 'CLICK MAP' : `$${item.cost.toLocaleString()}`} active={active} onClick={() => gameBus.emit('build-structure', kind)} />
         })}
       </div>
       {placementKind && <p className="placement-help">Move onto the battlefield and left-click to place. Esc or right-click cancels.</p>}
-      <UnitGrid title={faction === 'aegis' ? 'Barracks Tech' : 'Spawn Pit Brood'} hint={faction === 'aegis' ? 'Infantry and support troops.' : 'Fast biological assault organisms.'} units={data.infantry} />
-      <UnitGrid title={faction === 'aegis' ? 'War Factory Tech' : 'Gene Forge Brood'} hint={faction === 'aegis' ? 'Armor, aircraft and economy units.' : 'Heavy organisms, fliers and extractor drones.'} units={data.factory} />
+
+      <UnitGrid title={buildingLabel('barracks', faction)} hint="Infantry, ranged specialists and battlefield support." units={data.infantry} />
+      <UnitGrid title={buildingLabel('warfactory', faction)} hint="Ground armor, heavy organisms / constructs and economy workers." units={data.factory} />
+      <UnitGrid title={buildingLabel('airfield', faction)} hint="Air-superiority and advanced flying combat units." units={data.air} />
 
       <div className="section-title queue-title"><span>Live Queues</span><small>{queues.length} ACTIVE</small></div>
-      {queues.length === 0 ? <p className="muted">Production buildings are idle.</p> : queues.map((queue) => (
+      {queues.length === 0 ? <p className="muted">Production structures are idle.</p> : queues.map((queue) => (
         <div className="production-queue" key={queue.buildingId}>
           <div className="queue-head"><strong>{queue.buildingLabel}</strong><span>{queue.activeLabel}</span></div>
           <div className="queue-progress"><i style={{ width: `${Math.round(queue.progress * 100)}%` }} /></div>

@@ -3,6 +3,7 @@ import type { Team } from '../../types'
 import type { Building } from '../entities/Building'
 import type { Damageable } from '../entities/Damageable'
 import type { Unit } from '../entities/Unit'
+import { UNIT_STATS } from '../config'
 
 type VisibilityCheck = (team: Team, target: Damageable) => boolean
 
@@ -20,7 +21,7 @@ export class CombatSystem {
     buildings: Building[],
     canEngage: VisibilityCheck = () => true,
   ): void {
-    const combatUnits = units.filter((item) => item.alive && item.kind !== 'harvester' && item.kind !== 'drone' && item.kind !== 'medic')
+    const combatUnits = units.filter((item) => item.alive && UNIT_STATS[item.kind].damage > 0)
 
     for (const unit of combatUnits) {
       unit.expireTransientEffects(time)

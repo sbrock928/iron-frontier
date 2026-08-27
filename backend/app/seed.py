@@ -48,6 +48,31 @@ MISSION_02: dict[str, object] = {
     },
 }
 
+MISSION_03: dict[str, object] = {
+    "world_width": 3000,
+    "world_height": 1760,
+    "starting_credits": 6800,
+    "player_spawn": {"x": 520, "y": 860},
+    "enemy_spawn": {"x": 2500, "y": 880},
+    "ore_fields": [
+        {"x": 860, "y": 520},
+        {"x": 900, "y": 1260},
+        {"x": 1500, "y": 860},
+        {"x": 2140, "y": 520},
+        {"x": 2180, "y": 1280},
+    ],
+    "objectives": [
+        {"id": "tech", "label": "Construct an advanced research structure and complete a tier-3 upgrade", "type": "research", "target": "tier3"},
+        {"id": "air", "label": "Establish air production and contest the center", "type": "build", "target": "airfield"},
+        {"id": "destroy", "label": "Destroy the opposing command core", "type": "destroy", "target": "enemy_conyard"},
+    ],
+    "enemy": {
+        "attack_interval_seconds": 24,
+        "starting_units": 8,
+        "production_multiplier": 1.2,
+    },
+}
+
 SKIRMISH_01: dict[str, object] = {
     "world_width": 3200,
     "world_height": 1900,
@@ -84,6 +109,12 @@ MISSIONS = [
         "Black Skies Counterstroke",
         "Push into a fortified frontier, unlock advanced air technology, and break the opposing fortress.",
         MISSION_02,
+    ),
+    (
+        "mission_03",
+        "Fractured Convergence",
+        "A tech-heavy three-race battlefield designed around advanced research, air control, and tier-3 units.",
+        MISSION_03,
     ),
     (
         "skirmish_01",

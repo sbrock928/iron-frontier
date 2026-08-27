@@ -1,0 +1,107 @@
+import { DIFFICULTY_DATA, FACTION_DATA } from '../game/config'
+import type { Difficulty, Faction, Mission } from '../types'
+import { useGameStore } from '../store/gameStore'
+
+const factions = Object.keys(FACTION_DATA) as Faction[]
+const difficulties = Object.keys(DIFFICULTY_DATA) as Difficulty[]
+
+export function MainMenu({
+  missions,
+  missionId,
+  playerFaction,
+  enemyFaction,
+  difficulty,
+  onMissionChange,
+  onPlayerFactionChange,
+  onEnemyFactionChange,
+  onDifficultyChange,
+  onStart,
+}: {
+  missions: Mission[]
+  missionId: string
+  playerFaction: Faction
+  enemyFaction: Faction
+  difficulty: Difficulty
+  onMissionChange: (value: string) => void
+  onPlayerFactionChange: (value: Faction) => void
+  onEnemyFactionChange: (value: Faction) => void
+  onDifficultyChange: (value: Difficulty) => void
+  onStart: () => void
+}) {
+  const mission = missions.find((item) => item.id === missionId) ?? missions[0]
+  const status = useGameStore((state) => state.status)
+  const message = useGameStore((state) => state.message)
+
+  return (
+    <main className="main-menu-shell">
+      <div className="menu-backdrop" />
+      <section className="menu-card">
+        <header className="menu-header">
+          <div className="menu-eyebrow">TACTICAL COMMAND NETWORK</div>
+          <h1>IRON FRONTIER</h1>
+          <p>Choose your faction, opposition, battlefield and threat level before deployment.</p>
+        </header>
+
+        {status === 'error' && <div className="menu-error"><strong>BACKEND CONNECTION FAILED</strong><span>{message}</span><small>Start FastAPI on 127.0.0.1:8000, then refresh this page.</small></div>}
+
+        <div className="menu-section-title"><span>01</span><strong>Choose your race</strong></div>
+        <div className="faction-card-grid">
+          {factions.map((faction) => {
+            const data = FACTION_DATA[faction]
+            const active = faction === playerFaction
+            return (
+              <button key={faction} className={`faction-card ${active ? 'active' : ''}`} onClick={() => onPlayerFactionChange(faction)}>
+                <img src={data.emblem} alt="" aria-hidden="true" />
+                <div><strong>{data.name}</strong><span>{data.tagline}</span></div>
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="menu-grid-two">
+          <div>
+            <div className="menu-section-title compact"><span>02</span><strong>Opponent</strong></div>
+            <label className="menu-select-label">
+              <span>Enemy race</span>
+              <select value={enemyFaction} onChange={(event) => onEnemyFactionChange(event.target.value as Faction)}>
+                {factions.map((faction) => <option value={faction} key={faction}>{FACTION_DATA[faction].name}</option>)}
+              </select>
+            </label>
+          </div>
+          <div>
+            <div className="menu-section-title compact"><span>03</span><strong>Threat level</strong></div>
+            <div className="difficulty-grid">
+              {difficulties.map((key) => <button key={key} className={difficulty === key ? 'active' : ''} onClick={() => onDifficultyChange(key)}>{DIFFICULTY_DATA[key].label}</button>)}
+            </div>
+          </div>
+        </div>
+
+        <div className="menu-section-title"><span>04</span><strong>Battlefield</strong></div>
+        <div className="mission-chooser">
+          <label className="menu-select-label">
+            <span>Mission / skirmish</span>
+            <select value={missionId} onChange={(event) => onMissionChange(event.target.value)}>
+              {missions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+          </label>
+          <div className="mission-preview">
+            <strong>{mission?.name ?? 'Loading scenarios…'}</strong>
+            <p>{mission?.description ?? 'Retrieving battlefield data from FastAPI…'}</p>
+            {mission && <div className="mission-stats"><span>{mission.definition.world_width} × {mission.definition.world_height}</span><span>${mission.definition.starting_credits.toLocaleString()} start</span><span>{mission.definition.ore_fields.length} resource zones</span></div>}
+          </div>
+        </div>
+
+        <footer className="menu-footer">
+          <div className="matchup-summary">
+            <img src={FACTION_DATA[playerFaction].emblem} alt="" />
+            <strong>{FACTION_DATA[playerFaction].shortName}</strong>
+            <span>VS</span>
+            <strong>{FACTION_DATA[enemyFaction].shortName}</strong>
+            <img src={FACTION_DATA[enemyFaction].emblem} alt="" />
+          </div>
+          <button className="deploy-button" disabled={!mission} onClick={onStart}>DEPLOY FORCES</button>
+        </footer>
+      </section>
+    </main>
+  )
+}

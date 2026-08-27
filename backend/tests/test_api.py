@@ -25,3 +25,12 @@ def test_save_round_trip(client: TestClient) -> None:
     loaded = client.get("/api/v1/saves/quick")
     assert loaded.status_code == 200
     assert loaded.json()["payload"]["credits"] == 1234
+
+
+def test_three_race_expansion_scenarios_are_seeded(client: TestClient) -> None:
+    response = client.get("/api/v1/missions")
+    assert response.status_code == 200
+    missions = {item["id"]: item for item in response.json()}
+    assert "mission_03" in missions
+    assert missions["mission_03"]["name"] == "Fractured Convergence"
+    assert "skirmish_01" in missions

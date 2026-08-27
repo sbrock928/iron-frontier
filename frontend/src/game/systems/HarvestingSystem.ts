@@ -1,4 +1,5 @@
 import type { Team } from '../../types'
+import { WORKER_KINDS } from '../config'
 import type { Building } from '../entities/Building'
 import type { ResourcePatch } from '../entities/ResourcePatch'
 import type { Unit } from '../entities/Unit'
@@ -12,7 +13,7 @@ export class HarvestingSystem {
     addCredits: (team: Team, amount: number) => void,
     harvestMultiplier: (team: Team) => number = () => 1,
   ): void {
-    const workers = units.filter((unit) => unit.alive && (unit.kind === 'harvester' || unit.kind === 'drone'))
+    const workers = units.filter((unit) => unit.alive && WORKER_KINDS.has(unit.kind))
     for (const harvester of workers) {
       const refineries = buildings.filter((building) => building.alive && building.team === harvester.team && building.kind === 'refinery')
       if (refineries.length === 0) continue

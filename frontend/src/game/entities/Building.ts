@@ -9,7 +9,9 @@ export class Building implements Damageable {
   readonly team: Team
   readonly faction: Faction
   readonly maxHp: number
+  readonly maxShield: number
   hp: number
+  shield: number
   alive = true
   x: number
   y: number
@@ -20,6 +22,9 @@ export class Building implements Damageable {
   private readonly label: Phaser.GameObjects.Text
   private readonly healthBack: Phaser.GameObjects.Rectangle
   private readonly healthFront: Phaser.GameObjects.Rectangle
+  private readonly shieldBack: Phaser.GameObjects.Rectangle
+  private readonly shieldFront: Phaser.GameObjects.Rectangle
+  private lastDamagedAt = -100000
   private readonly selection: Phaser.GameObjects.Ellipse
   lastShotAt = 0
   rallyPoint: Phaser.Math.Vector2 | null = null
@@ -33,6 +38,8 @@ export class Building implements Damageable {
     this.faction = faction
     this.maxHp = stats.hp
     this.hp = stats.hp
+    this.maxShield = faction === 'veyra' ? Math.round(stats.hp * 0.45) : 0
+    this.shield = this.maxShield
     this.x = x
     this.y = y
     this.size = stats.size
@@ -53,13 +60,15 @@ export class Building implements Damageable {
     }).setOrigin(0.5)
     this.healthBack = scene.add.rectangle(x, y - stats.size * 0.44, stats.size * 0.72, 6, 0x060907)
     this.healthFront = scene.add.rectangle(x - stats.size * 0.36, y - stats.size * 0.44, stats.size * 0.72, 6, team === 'player' ? 0x7dde7d : 0xd987ff).setOrigin(0, 0.5)
+    this.shieldBack = scene.add.rectangle(x, y - stats.size * 0.44 - 7, stats.size * 0.72, 4, 0x151126).setVisible(this.maxShield > 0)
+    this.shieldFront = scene.add.rectangle(x - stats.size * 0.36, y - stats.size * 0.44 - 7, stats.size * 0.72, 4, 0xb784ff).setOrigin(0, 0.5).setVisible(this.maxShield > 0)
     this.playSpawnTween(scene)
     scene.tweens.add({ targets: this.glow, alpha: { from: 0.10, to: kind === 'power' ? 0.32 : 0.22 }, duration: kind === 'power' ? 900 : 1500, yoyo: true, repeat: -1, ease: 'Sine.InOut' })
     this.syncGraphics()
   }
 
   private shortLabel(): string {
-    const names: Record<BuildingKind, string> = { conyard: 'CY', power: 'PWR', refinery: 'REF', barracks: 'BAR', warfactory: 'WF', turret: 'TUR' }
+    const names: Record<BuildingKind, string> = { conyard: 'CY', power: 'PWR', refinery: 'REF', barracks: 'BAR', warfactory: 'WF', airfield: 'AIR', techlab: 'TECH', turret: 'TUR', detector: 'DET' }
     return names[this.kind]
   }
 
@@ -72,23 +81,43 @@ export class Building implements Damageable {
     this.label.setVisible(visible)
     this.healthBack.setVisible(visible)
     this.healthFront.setVisible(visible)
+    this.shieldBack.setVisible(visible && this.maxShield > 0)
+    this.shieldFront.setVisible(visible && this.maxShield > 0)
     if (!visible) this.selection.setVisible(false)
   }
 
   toSelectedEntity(): SelectedEntity {
-    return { id: this.id, label: buildingLabel(this.kind, this.faction), kind: this.kind, hp: Math.max(0, Math.round(this.hp)), maxHp: this.maxHp, team: this.team }
+    return { id: this.id, label: buildingLabel(this.kind, this.faction), kind: this.kind, hp: Math.max(0, Math.round(this.hp)), maxHp: this.maxHp, shield: this.maxShield > 0 ? Math.round(this.shield) : undefined, maxShield: this.maxShield > 0 ? this.maxShield : undefined, team: this.team }
   }
 
   takeDamage(amount: number): void {
     if (!this.alive) return
-    this.hp -= amount
+    this.lastDamagedAt = this.body.scene.time.now
+    let incoming = amount
+    if (this.shield > 0) {
+      const absorbed = Math.min(this.shield, incoming)
+      this.shield -= absorbed
+      incoming -= absorbed
+    }
+    if (incoming > 0) this.hp -= incoming
     if (this.hp <= 0) {
       this.alive = false
       this.destroy()
       return
     }
-    this.healthFront.displayWidth = this.size * 0.72 * Math.max(0, this.hp / this.maxHp)
+    this.refreshBars()
     this.body.scene.tweens.add({ targets: this.body, alpha: 0.62, duration: 90, yoyo: true, onComplete: () => this.body.setAlpha(1) })
+  }
+
+  updateShield(deltaMs: number, now: number): void {
+    if (!this.alive || this.maxShield <= 0 || this.shield >= this.maxShield || now - this.lastDamagedAt < 4000) return
+    this.shield = Math.min(this.maxShield, this.shield + 9 * (deltaMs / 1000))
+    this.refreshBars()
+  }
+
+  private refreshBars(): void {
+    this.healthFront.displayWidth = this.size * 0.72 * Math.max(0, this.hp / this.maxHp)
+    if (this.maxShield > 0) this.shieldFront.displayWidth = this.size * 0.72 * Math.max(0, this.shield / this.maxShield)
   }
 
   setRallyPoint(x: number, y: number): void {
@@ -111,6 +140,8 @@ export class Building implements Damageable {
     this.body.setPosition(this.x, this.y).setDepth(depth)
     this.selection.setPosition(this.x, this.y + this.size * 0.22).setDepth(depth - 3)
     this.label.setPosition(this.x, this.y + this.size * 0.26).setDepth(depth + 1)
+    this.shieldBack.setPosition(this.x, this.y - this.size * 0.44 - 7).setDepth(depth + 2)
+    this.shieldFront.setPosition(this.x - this.size * 0.36, this.y - this.size * 0.44 - 7).setDepth(depth + 3)
     this.healthBack.setPosition(this.x, this.y - this.size * 0.44).setDepth(depth + 2)
     this.healthFront.setPosition(this.x - this.size * 0.36, this.y - this.size * 0.44).setDepth(depth + 3)
   }
@@ -136,6 +167,6 @@ export class Building implements Damageable {
       if (!wreck.active) return
       scene.tweens.add({ targets: wreck, alpha: 0, duration: 6000, onComplete: () => wreck.destroy() })
     })
-    this.rallyMarker?.destroy(); this.shadow.destroy(); this.glow.destroy(); this.body.destroy(); this.label.destroy(); this.healthBack.destroy(); this.healthFront.destroy(); this.selection.destroy()
+    this.rallyMarker?.destroy(); this.shadow.destroy(); this.glow.destroy(); this.body.destroy(); this.label.destroy(); this.shieldBack.destroy(); this.shieldFront.destroy(); this.healthBack.destroy(); this.healthFront.destroy(); this.selection.destroy()
   }
 }

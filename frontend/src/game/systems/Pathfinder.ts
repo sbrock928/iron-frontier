@@ -10,6 +10,7 @@ const key = (cell: Cell) => `${cell.col},${cell.row}`
 
 export class Pathfinder {
   findPath(start: Point, goal: Point, buildings: Building[], worldWidth: number, worldHeight: number): Point[] {
+    if ('isFlying' in start && Boolean((start as Point & { isFlying?: boolean }).isFlying)) return [goal]
     const cols = Math.ceil(worldWidth / GRID_SIZE)
     const rows = Math.ceil(worldHeight / GRID_SIZE)
     const startCell = this.toCell(start, cols, rows)

@@ -6,15 +6,17 @@ import type { Damageable } from './Damageable'
 type HarvestState = 'seeking' | 'harvesting' | 'returning'
 
 function footprintFor(kind: UnitKind): number {
-  if (kind === 'tank' || kind === 'brute') return 46
-  if (kind === 'artillery' || kind === 'harvester' || kind === 'gunship' || kind === 'wraith' || kind === 'drone') return 52
-  if (kind === 'spitter') return 42
-  if (kind === 'marauder') return 34
-  return 26
+  const stats = UNIT_STATS[kind]
+  if (stats.role === 'air' || stats.role === 'worker') return 52
+  if (stats.role === 'vehicle') return kind === 'colossus' ? 62 : 48
+  if (kind === 'spitter' || kind === 'broodcaster') return 40
+  if (kind === 'marauder' || kind === 'adept') return 34
+  return 27
 }
 
 function wreckScaleFor(kind: UnitKind): number {
-  return kind === 'rifleman' || kind === 'medic' || kind === 'skitter' ? 54 : 100
+  const role = UNIT_STATS[kind].role
+  return role === 'infantry' || role === 'support' ? 58 : 104
 }
 
 export class Unit implements Damageable {
@@ -22,7 +24,9 @@ export class Unit implements Damageable {
   readonly kind: UnitKind
   readonly team: Team
   readonly maxHp: number
+  readonly maxShield: number
   hp: number
+  shield: number
   alive = true
   x: number
   y: number
@@ -32,6 +36,8 @@ export class Unit implements Damageable {
   private readonly selection: Phaser.GameObjects.Ellipse
   private readonly healthBack: Phaser.GameObjects.Rectangle
   private readonly healthFront: Phaser.GameObjects.Rectangle
+  private readonly shieldBack: Phaser.GameObjects.Rectangle
+  private readonly shieldFront: Phaser.GameObjects.Rectangle
   private readonly spriteWidth: number
   private readonly spriteHeight: number
   private path: Phaser.Math.Vector2[] = []
@@ -48,6 +54,8 @@ export class Unit implements Damageable {
   frenzyUntil = 0
   acidBurstUntil = 0
   phaseUntil = 0
+  resonanceUntil = 0
+  overchargeUntil = 0
   lastHealAt = 0
   attackMoveActive = false
   attackMoveGoal: Phaser.Math.Vector2 | null = null
@@ -57,6 +65,8 @@ export class Unit implements Damageable {
   private visionBonus = 0
   private rangeBonus = 0
   private damageReduction = 0
+  private shieldRegenModifier = 1
+  private lastDamagedAt = -100000
 
   constructor(scene: Phaser.Scene, id: string, kind: UnitKind, team: Team, x: number, y: number) {
     this.id = id
@@ -67,18 +77,22 @@ export class Unit implements Damageable {
     const stats = UNIT_STATS[kind]
     this.maxHp = stats.hp
     this.hp = stats.hp
+    this.maxShield = stats.shield ?? 0
+    this.shield = this.maxShield
     this.spriteWidth = stats.spriteSize.width
     this.spriteHeight = stats.spriteSize.height
 
     const footprint = footprintFor(kind)
     this.shadow = scene.add.ellipse(x, y + (stats.isFlying ? 26 : 14), footprint + 24, footprint * 0.82, 0x020403, stats.isFlying ? 0.22 : 0.42)
-    this.glow = scene.add.image(x, y, UNIT_TEXTURES[kind]).setDisplaySize(this.spriteWidth, this.spriteHeight).setAlpha(0.16)
+    this.glow = scene.add.image(x, y, UNIT_TEXTURES[kind]).setDisplaySize(this.spriteWidth, this.spriteHeight).setAlpha(this.maxShield > 0 ? 0.23 : 0.16)
     this.body = scene.add.sprite(x, y, UNIT_SHEETS[kind], 0).setDisplaySize(this.spriteWidth, this.spriteHeight)
-    this.glow.setTint(team === 'player' ? 0x5deee0 : 0xae71ff)
+    this.glow.setTint(this.maxShield > 0 ? 0xb78cff : team === 'player' ? 0x5deee0 : 0xae71ff)
     this.body.setTint(team === 'player' ? TEAM_TINT.player : TEAM_TINT.enemy)
-    this.selection = scene.add.ellipse(x, y + 12, footprint + 34, footprint + 18).setStrokeStyle(2, team === 'player' ? 0x9effc4 : 0xe295ff).setVisible(false)
+    this.selection = scene.add.ellipse(x, y + 12, footprint + 34, footprint + 18).setStrokeStyle(2, this.maxShield > 0 ? 0xc79aff : team === 'player' ? 0x9effc4 : 0xe295ff).setVisible(false)
     this.healthBack = scene.add.rectangle(x, y - this.spriteHeight * 0.54, 42, 5, 0x0b0e0b).setOrigin(0.5)
     this.healthFront = scene.add.rectangle(x - 21, y - this.spriteHeight * 0.54, 42, 5, team === 'player' ? 0x78e985 : 0xd987ff).setOrigin(0, 0.5)
+    this.shieldBack = scene.add.rectangle(x, y - this.spriteHeight * 0.54 - 6, 42, 4, 0x10101b).setOrigin(0.5).setVisible(this.maxShield > 0)
+    this.shieldFront = scene.add.rectangle(x - 21, y - this.spriteHeight * 0.54 - 6, 42, 4, 0xa67cff).setOrigin(0, 0.5).setVisible(this.maxShield > 0)
     this.playSpawnTween(scene)
     this.syncGraphics()
   }
@@ -94,18 +108,21 @@ export class Unit implements Damageable {
     if (this.phaseUntil > 0) value *= 1.48
     if (this.stimUntil > 0) value *= 1.28
     if (this.frenzyUntil > 0) value *= 1.32
+    if (this.resonanceUntil > 0) value *= 1.22
     return value * this.speedModifier
   }
   get range(): number {
     let value = this.baseStats.range
     if (this.siegeMode) value += 120
     if (this.acidBurstUntil > 0) value += 70
+    if (this.overchargeUntil > 0) value += 30
     return value + this.rangeBonus
   }
   get acquireRange(): number {
     let value = this.baseStats.acquireRange
     if (this.siegeMode) value += 120
     if (this.acidBurstUntil > 0) value += 70
+    if (this.overchargeUntil > 0) value += 30
     return value + this.rangeBonus
   }
   get vision(): number { return this.baseStats.vision + (this.isFlying ? 70 : 0) + this.visionBonus }
@@ -115,6 +132,7 @@ export class Unit implements Damageable {
     if (this.stimUntil > 0) value *= 1.20
     if (this.frenzyUntil > 0) value *= 1.24
     if (this.acidBurstUntil > 0) value *= 1.32
+    if (this.overchargeUntil > 0) value *= 1.28
     return Math.round(value * this.damageModifier)
   }
   get cooldown(): number {
@@ -122,6 +140,7 @@ export class Unit implements Damageable {
     if (this.stimUntil > 0) value *= 0.78
     if (this.frenzyUntil > 0) value *= 0.76
     if (this.acidBurstUntil > 0) value *= 0.86
+    if (this.overchargeUntil > 0) value *= 0.82
     return Math.max(220, Math.round(value * this.cooldownModifier))
   }
   get hasMoveOrder(): boolean { return this.path.length > 0 }
@@ -134,11 +153,22 @@ export class Unit implements Damageable {
     this.body.setVisible(visible)
     this.healthBack.setVisible(visible)
     this.healthFront.setVisible(visible)
+    this.shieldBack.setVisible(visible && this.maxShield > 0)
+    this.shieldFront.setVisible(visible && this.maxShield > 0)
     if (!visible) this.selection.setVisible(false)
   }
 
   toSelectedEntity(): SelectedEntity {
-    return { id: this.id, label: UNIT_STATS[this.kind].label, kind: this.kind, hp: Math.max(0, Math.round(this.hp)), maxHp: this.maxHp, team: this.team }
+    return {
+      id: this.id,
+      label: UNIT_STATS[this.kind].label,
+      kind: this.kind,
+      hp: Math.max(0, Math.round(this.hp)),
+      maxHp: this.maxHp,
+      shield: this.maxShield > 0 ? Math.max(0, Math.round(this.shield)) : undefined,
+      maxShield: this.maxShield > 0 ? this.maxShield : undefined,
+      team: this.team,
+    }
   }
 
   setPath(points: Phaser.Math.Vector2[]): void {
@@ -155,15 +185,8 @@ export class Unit implements Damageable {
     this.clearAttackTarget()
   }
 
-  resumeAttackMove(points: Phaser.Math.Vector2[]): void {
-    if (!this.attackMoveActive) return
-    this.path = points
-  }
-
-  clearAttackMove(): void {
-    this.attackMoveActive = false
-    this.attackMoveGoal = null
-  }
+  resumeAttackMove(points: Phaser.Math.Vector2[]): void { if (this.attackMoveActive) this.path = points }
+  clearAttackMove(): void { this.attackMoveActive = false; this.attackMoveGoal = null }
 
   setAttackTarget(target: Damageable): void {
     this.path = []
@@ -173,15 +196,8 @@ export class Unit implements Damageable {
     this.attackTargetMode = 'manual'
   }
 
-  setAutoAttackTarget(target: Damageable): void {
-    this.attackTarget = target
-    this.attackTargetMode = 'auto'
-  }
-
-  clearAttackTarget(): void {
-    this.attackTarget = null
-    this.attackTargetMode = null
-  }
+  setAutoAttackTarget(target: Damageable): void { this.attackTarget = target; this.attackTargetMode = 'auto' }
+  clearAttackTarget(): void { this.attackTarget = null; this.attackTargetMode = null }
 
   stop(): void {
     this.path = []
@@ -191,44 +207,30 @@ export class Unit implements Damageable {
     this.setMoving(false)
   }
 
-  nudge(dx: number, dy: number): void {
-    if (!this.alive) return
-    this.x += dx
-    this.y += dy
-    this.syncGraphics()
-  }
+  nudge(dx: number, dy: number): void { if (this.alive && !this.isFlying) { this.x += dx; this.y += dy; this.syncGraphics() } }
 
-  applyUpgradeModifiers(modifiers: { speed?: number; damage?: number; cooldown?: number; visionBonus?: number; rangeBonus?: number; damageReduction?: number }): void {
+  applyUpgradeModifiers(modifiers: { speed?: number; damage?: number; cooldown?: number; visionBonus?: number; rangeBonus?: number; damageReduction?: number; shieldRegen?: number }): void {
     this.speedModifier = modifiers.speed ?? 1
     this.damageModifier = modifiers.damage ?? 1
     this.cooldownModifier = modifiers.cooldown ?? 1
     this.visionBonus = modifiers.visionBonus ?? 0
     this.rangeBonus = modifiers.rangeBonus ?? 0
     this.damageReduction = modifiers.damageReduction ?? 0
+    this.shieldRegenModifier = modifiers.shieldRegen ?? 1
   }
 
-  distanceTo(target: { x: number; y: number }): number {
-    return Phaser.Math.Distance.Between(this.x, this.y, target.x, target.y)
-  }
+  distanceTo(target: { x: number; y: number }): number { return Phaser.Math.Distance.Between(this.x, this.y, target.x, target.y) }
 
   updateMovement(deltaMs: number): void {
     if (!this.alive) return
-    this.expireTransientEffects(this.body.scene.time.now)
-    if (this.path.length === 0 || this.speed <= 0) {
-      this.setMoving(false)
-      return
-    }
+    const now = this.body.scene.time.now
+    this.expireTransientEffects(now)
+    this.regenerateShield(deltaMs, now)
+    if (this.path.length === 0 || this.speed <= 0) { this.setMoving(false); return }
     const next = this.path[0]
-    if (!next) {
-      this.setMoving(false)
-      return
-    }
+    if (!next) { this.setMoving(false); return }
     const distance = this.distanceTo(next)
-    if (distance < 7) {
-      this.path.shift()
-      if (this.path.length === 0) this.setMoving(false)
-      return
-    }
+    if (distance < 7) { this.path.shift(); if (this.path.length === 0) this.setMoving(false); return }
     this.setMoving(true)
     const step = (this.speed * deltaMs) / 1000
     const ratio = Math.min(1, step / Math.max(distance, 0.001))
@@ -243,10 +245,7 @@ export class Unit implements Damageable {
   moveDirectlyToward(target: { x: number; y: number }, deltaMs: number): void {
     if (this.speed <= 0) return
     const distance = this.distanceTo(target)
-    if (distance < 1) {
-      this.setMoving(false)
-      return
-    }
+    if (distance < 1) { this.setMoving(false); return }
     this.setMoving(true)
     const step = Math.min(distance, (this.speed * deltaMs) / 1000)
     const angle = Phaser.Math.Angle.Between(this.x, this.y, target.x, target.y)
@@ -260,94 +259,74 @@ export class Unit implements Damageable {
   heal(amount: number): void {
     if (!this.alive) return
     this.hp = Math.min(this.maxHp, this.hp + amount)
-    this.healthFront.displayWidth = 42 * Math.max(0, this.hp / this.maxHp)
+    this.refreshBars()
     this.glow.setAlpha(0.22)
-    this.body.scene.tweens.add({ targets: this.glow, alpha: 0.16, duration: 120 })
+    this.body.scene.tweens.add({ targets: this.glow, alpha: this.maxShield > 0 ? 0.23 : 0.16, duration: 120 })
+  }
+
+  rechargeShield(amount: number): void {
+    if (!this.alive || this.maxShield <= 0) return
+    this.shield = Math.min(this.maxShield, this.shield + amount)
+    this.refreshBars()
   }
 
   activateStim(now: number): boolean {
     if ((this.kind !== 'rifleman' && this.kind !== 'marauder') || this.hp <= 16 || now < this.abilityReadyAt) return false
-    this.hp = Math.max(1, this.hp - 10)
-    this.stimUntil = now + 8000
-    this.abilityReadyAt = now + 16000
-    this.healthFront.displayWidth = 42 * Math.max(0, this.hp / this.maxHp)
-    return true
+    this.hp = Math.max(1, this.hp - 10); this.stimUntil = now + 8000; this.abilityReadyAt = now + 16000; this.refreshBars(); return true
   }
-
-  toggleSiege(now: number): boolean {
-    if (this.kind !== 'artillery' || now < this.abilityReadyAt) return false
-    this.siegeMode = !this.siegeMode
-    this.abilityReadyAt = now + 700
-    return true
-  }
-
-  activateAfterburners(now: number): boolean {
-    if (this.kind !== 'gunship' || now < this.abilityReadyAt) return false
-    this.afterburnerUntil = now + 6000
-    this.abilityReadyAt = now + 15000
-    return true
-  }
-
-
-  activateFrenzy(now: number): boolean {
-    if ((this.kind !== 'skitter' && this.kind !== 'brute') || now < this.abilityReadyAt) return false
-    this.frenzyUntil = now + 7500
-    this.abilityReadyAt = now + 15000
-    return true
-  }
-
-  activateAcidBurst(now: number): boolean {
-    if (this.kind !== 'spitter' || now < this.abilityReadyAt) return false
-    this.acidBurstUntil = now + 6500
-    this.abilityReadyAt = now + 15000
-    return true
-  }
-
-  activatePhase(now: number): boolean {
-    if (this.kind !== 'wraith' || now < this.abilityReadyAt) return false
-    this.phaseUntil = now + 6000
-    this.abilityReadyAt = now + 14500
-    this.body.setAlpha(0.58)
-    this.glow.setAlpha(0.28)
-    return true
-  }
+  toggleSiege(now: number): boolean { if (this.kind !== 'artillery' || now < this.abilityReadyAt) return false; this.siegeMode = !this.siegeMode; this.abilityReadyAt = now + 700; return true }
+  activateAfterburners(now: number): boolean { if (this.kind !== 'gunship' && this.kind !== 'interceptor' || now < this.abilityReadyAt) return false; this.afterburnerUntil = now + 6000; this.abilityReadyAt = now + 15000; return true }
+  activateFrenzy(now: number): boolean { if (!['skitter','brute','ravager'].includes(this.kind) || now < this.abilityReadyAt) return false; this.frenzyUntil = now + 7500; this.abilityReadyAt = now + 15000; return true }
+  activateAcidBurst(now: number): boolean { if (this.kind !== 'spitter' && this.kind !== 'broodcaster' || now < this.abilityReadyAt) return false; this.acidBurstUntil = now + 6500; this.abilityReadyAt = now + 15000; return true }
+  activatePhase(now: number): boolean { if (this.kind !== 'wraith' && this.kind !== 'devourer' || now < this.abilityReadyAt) return false; this.phaseUntil = now + 6000; this.abilityReadyAt = now + 14500; this.body.setAlpha(0.58); this.glow.setAlpha(0.28); return true }
+  activateShieldSurge(now: number): boolean { if (this.maxShield <= 0 || now < this.abilityReadyAt) return false; this.rechargeShield(Math.max(30, this.maxShield * 0.32)); this.abilityReadyAt = now + 12000; return true }
+  activatePhaseStride(now: number): boolean { if (!['lancer','adept','seer'].includes(this.kind) || now < this.abilityReadyAt) return false; this.resonanceUntil = now + 7000; this.abilityReadyAt = now + 14500; return true }
+  activateOvercharge(now: number): boolean { if (!['sentinel','colossus','seraph','arbiter'].includes(this.kind) || now < this.abilityReadyAt) return false; this.overchargeUntil = now + 6500; this.abilityReadyAt = now + 15000; return true }
 
   expireTransientEffects(now: number): void {
     if (this.stimUntil && now > this.stimUntil) this.stimUntil = 0
     if (this.afterburnerUntil && now > this.afterburnerUntil) this.afterburnerUntil = 0
     if (this.frenzyUntil && now > this.frenzyUntil) this.frenzyUntil = 0
     if (this.acidBurstUntil && now > this.acidBurstUntil) this.acidBurstUntil = 0
-    if (this.phaseUntil && now > this.phaseUntil) {
-      this.phaseUntil = 0
-      this.body.setAlpha(1)
-      this.glow.setAlpha(0.16)
-    }
+    if (this.resonanceUntil && now > this.resonanceUntil) this.resonanceUntil = 0
+    if (this.overchargeUntil && now > this.overchargeUntil) this.overchargeUntil = 0
+    if (this.phaseUntil && now > this.phaseUntil) { this.phaseUntil = 0; this.body.setAlpha(1); this.glow.setAlpha(this.maxShield > 0 ? 0.23 : 0.16) }
   }
 
   takeDamage(amount: number): void {
     if (!this.alive) return
-    this.hp -= amount * (1 - this.damageReduction)
-    if (this.hp <= 0) {
-      this.alive = false
-      this.destroy()
-      return
+    let incoming = amount * (1 - this.damageReduction)
+    this.lastDamagedAt = this.body.scene.time.now
+    if (this.shield > 0) {
+      const absorbed = Math.min(this.shield, incoming)
+      this.shield -= absorbed
+      incoming -= absorbed
     }
-    this.healthFront.displayWidth = 42 * Math.max(0, this.hp / this.maxHp)
-    this.glow.setAlpha(0.28)
+    if (incoming > 0) this.hp -= incoming
+    if (this.hp <= 0) { this.alive = false; this.destroy(); return }
+    this.refreshBars()
+    this.glow.setAlpha(0.34)
     this.body.scene.tweens.add({ targets: this.body, alpha: 0.58, duration: 80, yoyo: true, onComplete: () => this.body.setAlpha(1) })
-    this.body.scene.tweens.add({ targets: this.glow, alpha: 0.14, duration: 80, yoyo: true, onComplete: () => this.glow.setAlpha(0.16) })
+    this.body.scene.tweens.add({ targets: this.glow, alpha: this.maxShield > 0 ? 0.23 : 0.16, duration: 100 })
+  }
+
+  private regenerateShield(deltaMs: number, now: number): void {
+    if (this.maxShield <= 0 || this.shield >= this.maxShield || now - this.lastDamagedAt < 3500) return
+    const rate = (this.baseStats.shieldRegen ?? 0) * this.shieldRegenModifier
+    if (rate <= 0) return
+    this.shield = Math.min(this.maxShield, this.shield + rate * (deltaMs / 1000))
+    this.refreshBars()
+  }
+
+  private refreshBars(): void {
+    this.healthFront.displayWidth = 42 * Math.max(0, this.hp / this.maxHp)
+    if (this.maxShield > 0) this.shieldFront.displayWidth = 42 * Math.max(0, this.shield / this.maxShield)
   }
 
   private setMoving(moving: boolean): void {
     const key = `${this.kind}-move`
-    if (moving) {
-      if (!this.body.anims.isPlaying || this.body.anims.currentAnim?.key !== key) this.body.play(key)
-      return
-    }
-    if (this.body.anims.isPlaying) {
-      this.body.stop()
-      this.body.setFrame(0)
-    }
+    if (moving) { if (!this.body.anims.isPlaying || this.body.anims.currentAnim?.key !== key) this.body.play(key); return }
+    if (this.body.anims.isPlaying) { this.body.stop(); this.body.setFrame(0) }
   }
 
   private syncGraphics(): void {
@@ -357,40 +336,27 @@ export class Unit implements Damageable {
     this.glow.setPosition(this.x, this.y + lift).setDepth(baseDepth - 1)
     this.body.setPosition(this.x, this.y + lift).setDepth(baseDepth)
     this.selection.setPosition(this.x, this.y + 12).setDepth(baseDepth - 4)
+    this.shieldBack.setPosition(this.x, this.y - this.spriteHeight * 0.54 - 6 + lift).setDepth(baseDepth + 2)
+    this.shieldFront.setPosition(this.x - 21, this.y - this.spriteHeight * 0.54 - 6 + lift).setDepth(baseDepth + 3)
     this.healthBack.setPosition(this.x, this.y - this.spriteHeight * 0.54 + lift).setDepth(baseDepth + 2)
     this.healthFront.setPosition(this.x - 21, this.y - this.spriteHeight * 0.54 + lift).setDepth(baseDepth + 3)
   }
 
   private playSpawnTween(scene: Phaser.Scene): void {
-    this.body.setScale(0.72)
-    this.glow.setScale(0.84)
+    this.body.setScale(0.72); this.glow.setScale(0.84)
     scene.tweens.add({ targets: [this.body], scaleX: 1, scaleY: 1, duration: 220, ease: 'Back.Out' })
     scene.tweens.add({ targets: [this.glow], scaleX: 1, scaleY: 1, duration: 260, ease: 'Sine.Out' })
   }
 
   destroy(): void {
     const scene = this.body.scene
-    scene.sound.play('sfx-explosion', { volume: this.kind === 'rifleman' || this.kind === 'medic' || this.kind === 'skitter' ? 0.18 : 0.32 })
+    scene.sound.play('sfx-explosion', { volume: this.baseStats.role === 'infantry' || this.baseStats.role === 'support' ? 0.18 : 0.32 })
     const explosion = scene.add.image(this.x, this.y, 'fx-explosion').setScale(0.1).setDepth(10000)
-    scene.tweens.add({
-      targets: explosion,
-      scaleX: this.kind === 'rifleman' || this.kind === 'medic' || this.kind === 'skitter' ? 0.4 : 0.7,
-      scaleY: this.kind === 'rifleman' || this.kind === 'medic' || this.kind === 'skitter' ? 0.4 : 0.7,
-      alpha: 0,
-      duration: 280,
-      onComplete: () => explosion.destroy(),
-    })
-    const wreckKey = this.kind === 'rifleman' || this.kind === 'medic' || this.kind === 'skitter' ? 'wreck-infantry' : 'wreck-vehicle'
+    scene.tweens.add({ targets: explosion, scaleX: this.baseStats.role === 'infantry' || this.baseStats.role === 'support' ? 0.4 : 0.7, scaleY: this.baseStats.role === 'infantry' || this.baseStats.role === 'support' ? 0.4 : 0.7, alpha: 0, duration: 280, onComplete: () => explosion.destroy() })
+    const wreckKey = this.baseStats.role === 'infantry' || this.baseStats.role === 'support' ? 'wreck-infantry' : 'wreck-vehicle'
     const wreckSize = wreckScaleFor(this.kind)
-    const wreck = scene.add.image(this.x, this.y + 8, wreckKey)
-      .setDisplaySize(wreckSize, wreckSize)
-      .setTint(this.team === 'player' ? 0x9fa8ab : 0x9b72bf)
-      .setAlpha(0.78)
-      .setDepth(90 + this.y * 0.1)
-    scene.time.delayedCall(42000, () => {
-      if (!wreck.active) return
-      scene.tweens.add({ targets: wreck, alpha: 0, duration: 4500, onComplete: () => wreck.destroy() })
-    })
-    this.shadow.destroy(); this.glow.destroy(); this.body.destroy(); this.selection.destroy(); this.healthBack.destroy(); this.healthFront.destroy()
+    const wreck = scene.add.image(this.x, this.y + 8, wreckKey).setDisplaySize(wreckSize, wreckSize).setTint(this.maxShield > 0 ? 0xb59cd8 : this.team === 'player' ? 0x9fa8ab : 0x9b72bf).setAlpha(0.78).setDepth(90 + this.y * 0.1)
+    scene.time.delayedCall(42000, () => { if (!wreck.active) return; scene.tweens.add({ targets: wreck, alpha: 0, duration: 4500, onComplete: () => wreck.destroy() }) })
+    this.shadow.destroy(); this.glow.destroy(); this.body.destroy(); this.selection.destroy(); this.healthBack.destroy(); this.healthFront.destroy(); this.shieldBack.destroy(); this.shieldFront.destroy()
   }
 }

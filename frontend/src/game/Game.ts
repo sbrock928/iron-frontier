@@ -1,13 +1,13 @@
 import Phaser from 'phaser'
-import type { Faction, Mission } from '../types'
+import type { Difficulty, Faction, Mission } from '../types'
 import { BattleScene } from './scenes/BattleScene'
 
-export function createGame(parent: HTMLElement, mission: Mission, faction: Faction): Phaser.Game {
+export function createGame(parent: HTMLElement, mission: Mission, faction: Faction, enemyFaction: Faction, difficulty: Difficulty): Phaser.Game {
   return new Phaser.Game({
     type: Phaser.AUTO,
     parent,
     backgroundColor: '#101713',
-    scene: [new BattleScene(mission, faction)],
+    scene: [new BattleScene(mission, faction, enemyFaction, difficulty)],
     scale: {
       mode: Phaser.Scale.RESIZE,
       width: '100%',

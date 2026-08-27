@@ -1,10 +1,12 @@
 import { create } from 'zustand'
-import type { BuildingKind, Faction, GameStatus, Mission, ProductionQueueView, ResearchQueueView, SelectedEntity, UpgradeKey } from '../types'
+import type { BuildingKind, Difficulty, Faction, GameStatus, Mission, ProductionQueueView, ResearchQueueView, SelectedEntity, UpgradeKey } from '../types'
 
 type GameState = {
   mission: Mission | null
   missions: Mission[]
   faction: Faction
+  enemyFaction: Faction
+  difficulty: Difficulty
   credits: number
   powerUsed: number
   powerCapacity: number
@@ -19,6 +21,8 @@ type GameState = {
   setMission: (mission: Mission) => void
   setMissionCatalog: (missions: Mission[]) => void
   setFaction: (faction: Faction) => void
+  setEnemyFaction: (faction: Faction) => void
+  setDifficulty: (difficulty: Difficulty) => void
   setEconomy: (credits: number, powerUsed: number, powerCapacity: number) => void
   setSelected: (selected: SelectedEntity[]) => void
   setStatus: (status: GameStatus, message?: string) => void
@@ -27,19 +31,21 @@ type GameState = {
   setResearchQueues: (queues: ResearchQueueView[]) => void
   setCompletedUpgrades: (upgrades: UpgradeKey[]) => void
   setAttackMoveArmed: (armed: boolean) => void
-  reset: () => void
+  resetBattleState: () => void
 }
 
 export const useGameStore = create<GameState>((set) => ({
   mission: null,
   missions: [],
   faction: 'aegis',
+  enemyFaction: 'noctis',
+  difficulty: 'normal',
   credits: 0,
   powerUsed: 0,
   powerCapacity: 0,
   selected: [],
   status: 'loading',
-  message: 'Loading mission…',
+  message: 'Loading command network…',
   placementKind: null,
   productionQueues: [],
   researchQueues: [],
@@ -48,6 +54,8 @@ export const useGameStore = create<GameState>((set) => ({
   setMission: (mission) => set({ mission, credits: mission.definition.starting_credits, status: 'playing', selected: [], productionQueues: [], researchQueues: [], completedUpgrades: [], attackMoveArmed: false }),
   setMissionCatalog: (missions) => set({ missions }),
   setFaction: (faction) => set({ faction, selected: [], placementKind: null, productionQueues: [], researchQueues: [], completedUpgrades: [], attackMoveArmed: false }),
+  setEnemyFaction: (enemyFaction) => set({ enemyFaction }),
+  setDifficulty: (difficulty) => set({ difficulty }),
   setEconomy: (credits, powerUsed, powerCapacity) => set({ credits, powerUsed, powerCapacity }),
   setSelected: (selected) => set({ selected }),
   setStatus: (status, message = '') => set({ status, message }),
@@ -56,5 +64,5 @@ export const useGameStore = create<GameState>((set) => ({
   setResearchQueues: (researchQueues) => set({ researchQueues }),
   setCompletedUpgrades: (completedUpgrades) => set({ completedUpgrades }),
   setAttackMoveArmed: (attackMoveArmed) => set({ attackMoveArmed }),
-  reset: () => set({ credits: 0, powerUsed: 0, powerCapacity: 0, selected: [], status: 'loading', placementKind: null, productionQueues: [], researchQueues: [], completedUpgrades: [], attackMoveArmed: false }),
+  resetBattleState: () => set({ credits: 0, powerUsed: 0, powerCapacity: 0, selected: [], status: 'loading', placementKind: null, productionQueues: [], researchQueues: [], completedUpgrades: [], attackMoveArmed: false }),
 }))

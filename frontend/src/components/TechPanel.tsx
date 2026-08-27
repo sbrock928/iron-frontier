@@ -11,7 +11,7 @@ export function TechPanel() {
 
   return (
     <section className="sidebar-section tech-panel">
-      <div className="section-title"><span>Technology</span><small>{faction === 'aegis' ? 'R&D' : 'EVOLUTION'}</small></div>
+      <div className="section-title"><span>Technology</span><small>{faction === 'aegis' ? 'R&D' : faction === 'noctis' ? 'EVOLUTION' : 'ASCENSION'}</small></div>
       <div className="tech-tree">
         {FACTION_UPGRADES[faction].map((key) => {
           const def = UPGRADE_DEFS[key]
