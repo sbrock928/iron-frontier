@@ -29,12 +29,16 @@ export function CommandConsole({ onExitToMenu }: { onExitToMenu: () => void }) {
         <div className="control-group-bar">
           {groupNumbers.map((group) => {
             const size = controlGroups[group]
+            const tooltip = size
+              ? `Recall control group ${group}\n${size} unit${size === 1 ? '' : 's'} assigned\nHotkey: ${group}`
+              : `Control group ${group} is empty\nAssign in-game with Ctrl+${group}`
             return (
               <button
                 key={group}
                 className={`control-group-badge ${size ? 'has-members' : ''}`.trim()}
                 disabled={!size}
-                title={size ? `Recall group ${group} (${size} unit${size === 1 ? '' : 's'})` : `Group ${group} is empty`}
+                data-tooltip={tooltip}
+                title={tooltip}
                 onClick={() => gameBus.emit('recall-control-group', group)}
               >
                 <span>{group}</span>
@@ -57,8 +61,16 @@ export function CommandConsole({ onExitToMenu }: { onExitToMenu: () => void }) {
       <div className="console-cell console-command">
         <CommandCard />
         <div className="console-system-row">
-          <button onClick={() => gameBus.emit('restart-game', undefined)}>Restart</button>
-          <button onClick={onExitToMenu}>Main Menu</button>
+          <button
+            data-tooltip="Restart the current battle from the beginning.\nCurrent progress will be lost."
+            title="Restart the current battle from the beginning. Current progress will be lost."
+            onClick={() => gameBus.emit('restart-game', undefined)}
+          >Restart</button>
+          <button
+            data-tooltip="Leave the current battle and return to match setup.\nCurrent progress will be lost."
+            title="Leave the current battle and return to match setup. Current progress will be lost."
+            onClick={onExitToMenu}
+          >Main Menu</button>
         </div>
       </div>
     </section>

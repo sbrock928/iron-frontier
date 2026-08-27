@@ -121,13 +121,15 @@ export type MinimapSnapshot = {
 export type CommandAction = {
   id: string
   label: string
+  /** Plain-language effect shown in the command tooltip. */
+  description?: string
   /** Single-character hotkey hint shown in the button corner. */
   hotkey: string
   icon: string
-  kind: 'build' | 'train' | 'research' | 'ability' | 'order' | 'submenu' | 'back'
+  kind: 'build' | 'train' | 'ability' | 'order' | 'submenu' | 'back'
   key: string
   cost?: number
-  /** Disabled buttons still occupy their grid slot so positions stay muscle-memory stable. */
+  /** Disabled general orders still occupy their grid slot so positions stay muscle-memory stable. */
   disabled?: boolean
   /** Why the action is unavailable, shown on hover. */
   reason?: string

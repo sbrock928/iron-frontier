@@ -28,6 +28,7 @@ export function SelectionStrip({ selected }: { selected: SelectedEntity[] }) {
           <button
             key={entity.id}
             className={`selection-chip health-${hurt}`}
+            data-tooltip={`${entity.label}\nHealth: ${entity.hp}/${entity.maxHp}\nClick to isolate · Shift-click to remove`}
             title={`${entity.label} — ${entity.hp}/${entity.maxHp}. Click to isolate, shift-click to remove.`}
             onClick={(event) => {
               if (event.shiftKey) gameBus.emit('selection-remove', entity.id)

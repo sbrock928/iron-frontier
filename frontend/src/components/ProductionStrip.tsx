@@ -30,7 +30,12 @@ export function ProductionStrip() {
           <div className="production-item" key={queue.buildingId}>
             <div className="production-head">
               <strong>{queue.activeLabel}</strong>
-              <button title="Cancel current order" onClick={() => gameBus.emit('cancel-production', queue.buildingId)}>
+              <button
+                data-tooltip={`Cancel ${queue.activeLabel}\nRemoves the active order from this structure.`}
+                title={`Cancel ${queue.activeLabel}`}
+                aria-label={`Cancel ${queue.activeLabel}`}
+                onClick={() => gameBus.emit('cancel-production', queue.buildingId)}
+              >
                 ✕
               </button>
             </div>

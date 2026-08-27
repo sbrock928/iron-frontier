@@ -8,6 +8,9 @@ export function TopBar() {
   const [saveLabel, setSaveLabel] = useState('Save')
 
   const supplyBlocked = supplyCap > 0 && supplyUsed >= supplyCap
+  const supplyTooltip = supplyBlocked
+    ? `Supply capped at ${supplyCap} — build more ${FACTION_DATA[faction].buildingLabels.power}s.`
+    : 'Supply committed out of the total currently available.'
   const friendly = FACTION_DATA[faction]
   const hostile = FACTION_DATA[enemyFaction]
 
@@ -59,12 +62,18 @@ export function TopBar() {
         </div>
         <div
           className={supplyBlocked ? 'danger' : ''}
-          title={supplyBlocked ? `Supply capped at ${supplyCap} — build more ${FACTION_DATA[faction].buildingLabels.power}s.` : 'Supply committed of total available'}
+          data-tooltip={supplyTooltip}
+          title={supplyTooltip}
         >
           <span>Supply</span>
           <strong>{supplyUsed} / {supplyCap}</strong>
         </div>
-        <button className="topbar-save" onClick={() => void quickSave()}>{saveLabel}</button>
+        <button
+          className="topbar-save"
+          data-tooltip="Quick-save the current matchup and economy snapshot.\nMid-battle unit positions are not persisted yet."
+          title="Quick-save the current matchup and economy snapshot. Mid-battle unit positions are not persisted yet."
+          onClick={() => void quickSave()}
+        >{saveLabel}</button>
       </div>
     </header>
   )

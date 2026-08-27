@@ -270,16 +270,16 @@ export type AbilityDefinition = {
   label: string
   description: string
   /**
-   * Unit kinds that can use the ability. An empty list means the ability
-   * applies to any selection belonging to the faction.
+   * Unit kinds that can use the ability. Every ability is selection-specific;
+   * definitions must name at least one suitable unit kind.
    */
   requiresKinds: UnitKind[]
 }
 
 /**
- * Faction abilities offered on the command card. Declared as data so the card
- * can render and enable/disable them generically; previously this mapping lived
- * as hardcoded JSX branches in the old command panel, where the enabling rules
+ * Faction abilities offered contextually on the command card. Declared as data
+ * so the card can match them to the current selection generically; previously
+ * this mapping lived as hardcoded JSX branches in the old command panel, where the enabling rules
  * were invisible to everything else in the codebase.
  */
 export const ABILITY_DEFS: AbilityDefinition[] = [
@@ -289,7 +289,7 @@ export const ABILITY_DEFS: AbilityDefinition[] = [
   { key: 'frenzy', faction: 'noctis', label: 'Brood Frenzy', description: 'Drives melee organisms into a temporary rage.', requiresKinds: ['skitter', 'brute', 'ravager'] },
   { key: 'acid_burst', faction: 'noctis', label: 'Acid Surge', description: 'Corrosive volley from ranged organisms.', requiresKinds: ['spitter', 'broodcaster'] },
   { key: 'phase', faction: 'noctis', label: 'Phase Veil', description: 'Briefly cloaks flying organisms.', requiresKinds: ['wraith', 'devourer'] },
-  { key: 'shield_surge', faction: 'veyra', label: 'Shield Surge', description: 'Immediately restores shields across the selection.', requiresKinds: [] },
+  { key: 'shield_surge', faction: 'veyra', label: 'Shield Surge', description: 'Immediately restores shields across the selection.', requiresKinds: ['lancer', 'adept', 'seer', 'sentinel', 'colossus', 'seraph', 'arbiter', 'probe'] },
   { key: 'phase_stride', faction: 'veyra', label: 'Phase Stride', description: 'Short-range blink for disciples.', requiresKinds: ['lancer', 'adept', 'seer'] },
   { key: 'overcharge', faction: 'veyra', label: 'Overcharge', description: 'Amplifies the weapons of heavy constructs.', requiresKinds: ['sentinel', 'colossus', 'seraph', 'arbiter'] },
 ]

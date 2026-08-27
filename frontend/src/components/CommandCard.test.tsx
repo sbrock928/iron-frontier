@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CommandCard } from './CommandCard'
+import { ResearchPanel } from './ResearchPanel'
 import { TopBar } from './TopBar'
 import { gameBus } from '../game/events/gameBus'
 import { useGameStore } from '../store/gameStore'
@@ -16,47 +17,63 @@ const mission = {
 
 const worker: SelectedEntity = { id: 'u1', label: 'Harvester', kind: 'harvester', hp: 430, maxHp: 430, team: 'player' }
 const rifleman: SelectedEntity = { id: 'u2', label: 'Rifleman', kind: 'rifleman', hp: 95, maxHp: 95, team: 'player' }
+const artillery: SelectedEntity = { id: 'u3', label: 'Siege Artillery', kind: 'artillery', hp: 250, maxHp: 250, team: 'player' }
+const techlab: SelectedEntity = { id: 'b1', label: 'Research Citadel', kind: 'techlab', hp: 820, maxHp: 820, team: 'player' }
 
 beforeEach(() => {
   useGameStore.getState().resetBattleState()
   useGameStore.setState({ mission, faction: 'aegis', enemyFaction: 'noctis', status: 'playing' })
 })
 
-describe('CommandCard research gating', () => {
-  it('disables Research when the player owns no structure that can research', () => {
-    useGameStore.getState().setSelected([rifleman])
+describe('ResearchPanel', () => {
+  it('shows the technology tree independently of unit selection', async () => {
+    const user = userEvent.setup()
     useGameStore.getState().setOwnedBuildingKinds([])
 
-    render(<CommandCard />)
+    render(<ResearchPanel />)
+    await user.click(screen.getByRole('button', { name: /Research/i }))
 
-    const research = screen.getByRole('button', { name: /Research/i })
-    expect(research).toBeDisabled()
-    expect(research).toHaveAttribute('title', expect.stringContaining('No research structure built'))
+    expect(screen.getByRole('button', { name: /Composite Plating/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Siege Doctrine/i })).toBeInTheDocument()
   })
 
-  it('enables Research once a structure that performs it exists', () => {
-    useGameStore.getState().setSelected([rifleman])
-    // Several tier-1 upgrades are researched at the barracks.
+  it('enables an upgrade once its structure, prerequisites, and cost are satisfied', async () => {
+    const user = userEvent.setup()
     useGameStore.getState().setOwnedBuildingKinds(['barracks'])
+    useGameStore.setState({ credits: 99999 })
 
-    render(<CommandCard />)
+    render(<ResearchPanel />)
+    await user.click(screen.getByRole('button', { name: /Research/i }))
 
-    expect(screen.getByRole('button', { name: /Research/i })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /Composite Plating/i })).toBeEnabled()
   })
 
   it('explains which structure a specific upgrade needs instead of failing silently', async () => {
     const user = userEvent.setup()
-    useGameStore.getState().setSelected([rifleman])
     useGameStore.getState().setOwnedBuildingKinds(['barracks'])
     useGameStore.setState({ credits: 99999 })
 
-    render(<CommandCard />)
+    render(<ResearchPanel />)
     await user.click(screen.getByRole('button', { name: /Research/i }))
 
-    // Siege Doctrine is a techlab upgrade; the player only has a barracks.
     const siege = screen.getByRole('button', { name: /Siege Doctrine/i })
     expect(siege).toBeDisabled()
     expect(siege).toHaveAttribute('title', expect.stringContaining('Requires Science Directorate'))
+  })
+
+  it('emits the selected upgrade without requiring a research structure selection', async () => {
+    const user = userEvent.setup()
+    const listener = vi.fn()
+    const unsubscribe = gameBus.on('research-upgrade', listener)
+    useGameStore.getState().setOwnedBuildingKinds(['barracks'])
+    useGameStore.setState({ credits: 99999 })
+
+    render(<ResearchPanel />)
+    await user.click(screen.getByRole('button', { name: /Research/i }))
+    await user.click(screen.getByRole('button', { name: /Composite Plating/i }))
+
+    expect(listener).toHaveBeenCalledWith('aegis_composite_plating')
+    unsubscribe()
   })
 })
 
@@ -97,6 +114,45 @@ describe('CommandCard orders', () => {
 
     expect(listener).not.toHaveBeenCalled()
     unsubscribe()
+  })
+
+  it('only shows abilities supported by the selected unit type', () => {
+    useGameStore.getState().setSelected([rifleman])
+
+    render(<CommandCard />)
+
+    expect(screen.getByRole('button', { name: /Stim Burst/i })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: /Toggle Siege/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Afterburners/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Research/i })).not.toBeInTheDocument()
+  })
+
+  it('updates contextual abilities when the selected unit type changes', () => {
+    useGameStore.getState().setSelected([artillery])
+
+    render(<CommandCard />)
+
+    expect(screen.getByRole('button', { name: /Toggle Siege/i })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: /Stim Burst/i })).not.toBeInTheDocument()
+  })
+
+  it('includes effect and hotkey details in ability tooltips', () => {
+    useGameStore.getState().setSelected([rifleman])
+    render(<CommandCard />)
+
+    expect(screen.getByRole('button', { name: /Stim Burst/i })).toHaveAttribute(
+      'title',
+      expect.stringMatching(/Temporary attack and movement boost[\s\S]*Hotkey:/),
+    )
+  })
+
+  it('does not expose a faction-wide ability for a building selection', () => {
+    useGameStore.setState({ faction: 'veyra' })
+    useGameStore.getState().setSelected([techlab])
+
+    render(<CommandCard />)
+
+    expect(screen.queryByRole('button', { name: /Shield Surge/i })).not.toBeInTheDocument()
   })
 })
 

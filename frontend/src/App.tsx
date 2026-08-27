@@ -4,6 +4,7 @@ import { CommandConsole } from './components/CommandConsole'
 import { GameCanvas } from './components/GameCanvas'
 import { MainMenu } from './components/MainMenu'
 import { MissionOverlay } from './components/MissionOverlay'
+import { ResearchPanel } from './components/ResearchPanel'
 import { TopBar } from './components/TopBar'
 import { defaultEnemyFaction } from './game/config'
 import { useGameStore } from './store/gameStore'
@@ -126,6 +127,7 @@ export default function App() {
           </div>
         )}
         <MissionOverlay />
+        <ResearchPanel />
       </div>
       <CommandConsole onExitToMenu={returnToMenu} />
     </main>

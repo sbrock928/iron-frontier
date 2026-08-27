@@ -41,7 +41,11 @@ export function AlertLog() {
           return (
             <li key={alert.id} className={`alert-row alert-${alert.severity}`}>
               {target ? (
-                <button onClick={() => gameBus.emit('jump-to-world', target)} title="Jump to location">
+                <button
+                  data-tooltip="Jump the camera to this alert's location."
+                  title="Jump to location"
+                  onClick={() => gameBus.emit('jump-to-world', target)}
+                >
                   {alert.message}
                 </button>
               ) : (

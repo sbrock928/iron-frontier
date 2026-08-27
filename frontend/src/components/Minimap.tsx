@@ -123,6 +123,7 @@ export function Minimap() {
         onPointerUp={handlePointerUp}
         onContextMenu={(event) => event.preventDefault()}
         aria-label="Tactical minimap"
+        title="Left-click or drag to move the camera. Right-click to issue a move order."
         role="img"
       />
       {!hasSnapshot && <span className="minimap-placeholder">SCANNING…</span>}

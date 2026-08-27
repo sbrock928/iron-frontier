@@ -17,7 +17,7 @@ export function MissionOverlay() {
 
   return (
     <details className="mission-overlay">
-      <summary>
+      <summary data-tooltip="Expand or collapse the mission objectives." title="Expand or collapse mission objectives">
         <span>Objectives</span>
         <small>{DIFFICULTY_DATA[difficulty].label.toUpperCase()}</small>
       </summary>
