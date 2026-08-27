@@ -21,6 +21,13 @@ export type UnitStats = {
   damage: number
   cooldown: number
   cost: number
+  /**
+   * Supply consumed while this unit is alive or in production. Scaled roughly
+   * with credit cost and battlefield weight: 1 for workers and light infantry,
+   * 5 for a faction's heaviest capital unit. This is what makes the supply cap
+   * bite — without it a player could field an unlimited army.
+   */
+  supply: number
   buildMs: number
   spriteSize: { width: number; height: number }
   requiredFactory: BuildingKind
@@ -34,7 +41,13 @@ export type BuildingStats = {
   label: string
   hp: number
   cost: number
-  power: number
+  /**
+   * Supply capacity this structure contributes while alive. Only the command
+   * yard and the faction's dedicated supply structure provide any; everything
+   * else is 0. Losing a provider can push a player over their cap, which
+   * blocks further training until it is rebuilt.
+   */
+  supply: number
   size: number
   vision: number
   spriteSize: { width: number; height: number }
@@ -148,49 +161,57 @@ export function factionBuildingIcon(kind: BuildingKind, faction: Faction): strin
 
 export const UNIT_STATS: Record<UnitKind, UnitStats> = {
   // Aegis infantry / support
-  rifleman: { label: 'Rifleman', hp: 95, speed: 110, range: 155, acquireRange: 230, vision: 340, damage: 13, cooldown: 650, cost: 220, buildMs: 1800, spriteSize: { width: 52, height: 52 }, requiredFactory: 'barracks', role: 'infantry', canAttackAir: true, canAttackGround: true },
-  medic: { label: 'Field Medic', hp: 82, speed: 110, range: 135, acquireRange: 0, vision: 340, damage: 0, cooldown: 0, cost: 260, buildMs: 2100, spriteSize: { width: 52, height: 52 }, requiredFactory: 'barracks', role: 'support', canAttackAir: false, canAttackGround: false },
-  marauder: { label: 'Marauder', hp: 185, speed: 94, range: 180, acquireRange: 250, vision: 350, damage: 24, cooldown: 860, cost: 420, buildMs: 3000, spriteSize: { width: 64, height: 64 }, requiredFactory: 'barracks', role: 'infantry', canAttackAir: false, canAttackGround: true },
-  sniper: { label: 'Specter Sniper', hp: 78, speed: 104, range: 310, acquireRange: 370, vision: 430, damage: 48, cooldown: 1700, cost: 620, buildMs: 4300, spriteSize: { width: 54, height: 54 }, requiredFactory: 'barracks', role: 'infantry', canAttackAir: false, canAttackGround: true },
+  rifleman: { label: 'Rifleman', hp: 95, speed: 110, range: 155, acquireRange: 230, vision: 340, damage: 13, cooldown: 650, cost: 220, supply: 1, buildMs: 1800, spriteSize: { width: 52, height: 52 }, requiredFactory: 'barracks', role: 'infantry', canAttackAir: true, canAttackGround: true },
+  medic: { label: 'Field Medic', hp: 82, speed: 110, range: 135, acquireRange: 0, vision: 340, damage: 0, cooldown: 0, cost: 260, supply: 1, buildMs: 2100, spriteSize: { width: 52, height: 52 }, requiredFactory: 'barracks', role: 'support', canAttackAir: false, canAttackGround: false },
+  marauder: { label: 'Marauder', hp: 185, speed: 94, range: 180, acquireRange: 250, vision: 350, damage: 24, cooldown: 860, cost: 420, supply: 2, buildMs: 3000, spriteSize: { width: 64, height: 64 }, requiredFactory: 'barracks', role: 'infantry', canAttackAir: false, canAttackGround: true },
+  sniper: { label: 'Specter Sniper', hp: 78, speed: 104, range: 310, acquireRange: 370, vision: 430, damage: 48, cooldown: 1700, cost: 620, supply: 2, buildMs: 4300, spriteSize: { width: 54, height: 54 }, requiredFactory: 'barracks', role: 'infantry', canAttackAir: false, canAttackGround: true },
   // Aegis armor / air / economy
-  tank: { label: 'Medium Tank', hp: 340, speed: 80, range: 220, acquireRange: 305, vision: 395, damage: 42, cooldown: 1150, cost: 850, buildMs: 4200, spriteSize: { width: 92, height: 92 }, requiredFactory: 'warfactory', role: 'vehicle', canAttackAir: false, canAttackGround: true },
-  artillery: { label: 'Siege Artillery', hp: 250, speed: 60, range: 310, acquireRange: 390, vision: 450, damage: 58, cooldown: 1750, cost: 1150, buildMs: 6200, spriteSize: { width: 96, height: 96 }, requiredFactory: 'warfactory', role: 'vehicle', canAttackAir: false, canAttackGround: true },
-  walker: { label: 'Goliath Walker', hp: 390, speed: 72, range: 235, acquireRange: 330, vision: 420, damage: 34, cooldown: 920, cost: 1080, buildMs: 5700, spriteSize: { width: 94, height: 94 }, requiredFactory: 'warfactory', role: 'vehicle', canAttackAir: true, canAttackGround: true },
-  gunship: { label: 'Gunship', hp: 260, speed: 120, range: 210, acquireRange: 300, vision: 470, damage: 26, cooldown: 760, cost: 980, buildMs: 5600, spriteSize: { width: 94, height: 94 }, requiredFactory: 'airfield', role: 'air', canAttackAir: true, canAttackGround: true, isFlying: true },
-  interceptor: { label: 'Valkyrie Interceptor', hp: 190, speed: 154, range: 245, acquireRange: 350, vision: 500, damage: 30, cooldown: 620, cost: 1200, buildMs: 6200, spriteSize: { width: 88, height: 88 }, requiredFactory: 'airfield', role: 'air', canAttackAir: true, canAttackGround: false, isFlying: true },
-  harvester: { label: 'Harvester', hp: 430, speed: 65, range: 0, acquireRange: 0, vision: 280, damage: 0, cooldown: 0, cost: 1200, buildMs: 5000, spriteSize: { width: 94, height: 94 }, requiredFactory: 'warfactory', role: 'worker', canAttackAir: false, canAttackGround: false },
+  tank: { label: 'Medium Tank', hp: 340, speed: 80, range: 220, acquireRange: 305, vision: 395, damage: 42, cooldown: 1150, cost: 850, supply: 3, buildMs: 4200, spriteSize: { width: 92, height: 92 }, requiredFactory: 'warfactory', role: 'vehicle', canAttackAir: false, canAttackGround: true },
+  artillery: { label: 'Siege Artillery', hp: 250, speed: 60, range: 310, acquireRange: 390, vision: 450, damage: 58, cooldown: 1750, cost: 1150, supply: 4, buildMs: 6200, spriteSize: { width: 96, height: 96 }, requiredFactory: 'warfactory', role: 'vehicle', canAttackAir: false, canAttackGround: true },
+  walker: { label: 'Goliath Walker', hp: 390, speed: 72, range: 235, acquireRange: 330, vision: 420, damage: 34, cooldown: 920, cost: 1080, supply: 4, buildMs: 5700, spriteSize: { width: 94, height: 94 }, requiredFactory: 'warfactory', role: 'vehicle', canAttackAir: true, canAttackGround: true },
+  gunship: { label: 'Gunship', hp: 260, speed: 120, range: 210, acquireRange: 300, vision: 470, damage: 26, cooldown: 760, cost: 980, supply: 3, buildMs: 5600, spriteSize: { width: 94, height: 94 }, requiredFactory: 'airfield', role: 'air', canAttackAir: true, canAttackGround: true, isFlying: true },
+  interceptor: { label: 'Valkyrie Interceptor', hp: 190, speed: 154, range: 245, acquireRange: 350, vision: 500, damage: 30, cooldown: 620, cost: 1200, supply: 3, buildMs: 6200, spriteSize: { width: 88, height: 88 }, requiredFactory: 'airfield', role: 'air', canAttackAir: true, canAttackGround: false, isFlying: true },
+  harvester: { label: 'Harvester', hp: 430, speed: 65, range: 0, acquireRange: 0, vision: 280, damage: 0, cooldown: 0, cost: 1200, supply: 1, buildMs: 5000, spriteSize: { width: 94, height: 94 }, requiredFactory: 'warfactory', role: 'worker', canAttackAir: false, canAttackGround: false },
 
   // Noctis
-  skitter: { label: 'Skitter Drone', hp: 82, speed: 126, range: 145, acquireRange: 225, vision: 315, damage: 12, cooldown: 540, cost: 190, buildMs: 1500, spriteSize: { width: 60, height: 60 }, requiredFactory: 'barracks', role: 'infantry', canAttackAir: false, canAttackGround: true },
-  spitter: { label: 'Spitter Beast', hp: 210, speed: 74, range: 265, acquireRange: 355, vision: 410, damage: 34, cooldown: 980, cost: 440, buildMs: 3000, spriteSize: { width: 88, height: 88 }, requiredFactory: 'barracks', role: 'infantry', canAttackAir: true, canAttackGround: true },
-  broodcaster: { label: 'Brood Caster', hp: 150, speed: 82, range: 290, acquireRange: 350, vision: 450, damage: 22, cooldown: 1050, cost: 640, buildMs: 4400, spriteSize: { width: 72, height: 72 }, requiredFactory: 'barracks', role: 'support', canAttackAir: true, canAttackGround: true },
-  brute: { label: 'Brute Mauler', hp: 360, speed: 78, range: 190, acquireRange: 285, vision: 365, damage: 40, cooldown: 1080, cost: 840, buildMs: 4300, spriteSize: { width: 96, height: 96 }, requiredFactory: 'warfactory', role: 'vehicle', canAttackAir: false, canAttackGround: true },
-  ravager: { label: 'Ravager Strain', hp: 450, speed: 68, range: 230, acquireRange: 320, vision: 400, damage: 52, cooldown: 1350, cost: 1180, buildMs: 6100, spriteSize: { width: 104, height: 104 }, requiredFactory: 'warfactory', role: 'vehicle', canAttackAir: false, canAttackGround: true },
-  wraith: { label: 'Wraith Flier', hp: 220, speed: 130, range: 200, acquireRange: 320, vision: 470, damage: 22, cooldown: 700, cost: 950, buildMs: 5200, spriteSize: { width: 90, height: 90 }, requiredFactory: 'airfield', role: 'air', canAttackAir: true, canAttackGround: true, isFlying: true },
-  devourer: { label: 'Devourer', hp: 390, speed: 102, range: 250, acquireRange: 350, vision: 470, damage: 46, cooldown: 1120, cost: 1380, buildMs: 7200, spriteSize: { width: 108, height: 108 }, requiredFactory: 'airfield', role: 'air', canAttackAir: true, canAttackGround: true, isFlying: true },
-  drone: { label: 'Extractor Drone', hp: 390, speed: 72, range: 0, acquireRange: 0, vision: 300, damage: 0, cooldown: 0, cost: 1050, buildMs: 4600, spriteSize: { width: 92, height: 92 }, requiredFactory: 'warfactory', role: 'worker', canAttackAir: false, canAttackGround: false },
+  skitter: { label: 'Skitter Drone', hp: 82, speed: 126, range: 145, acquireRange: 225, vision: 315, damage: 12, cooldown: 540, cost: 190, supply: 1, buildMs: 1500, spriteSize: { width: 60, height: 60 }, requiredFactory: 'barracks', role: 'infantry', canAttackAir: false, canAttackGround: true },
+  spitter: { label: 'Spitter Beast', hp: 210, speed: 74, range: 265, acquireRange: 355, vision: 410, damage: 34, cooldown: 980, cost: 440, supply: 2, buildMs: 3000, spriteSize: { width: 88, height: 88 }, requiredFactory: 'barracks', role: 'infantry', canAttackAir: true, canAttackGround: true },
+  broodcaster: { label: 'Brood Caster', hp: 150, speed: 82, range: 290, acquireRange: 350, vision: 450, damage: 22, cooldown: 1050, cost: 640, supply: 2, buildMs: 4400, spriteSize: { width: 72, height: 72 }, requiredFactory: 'barracks', role: 'support', canAttackAir: true, canAttackGround: true },
+  brute: { label: 'Brute Mauler', hp: 360, speed: 78, range: 190, acquireRange: 285, vision: 365, damage: 40, cooldown: 1080, cost: 840, supply: 3, buildMs: 4300, spriteSize: { width: 96, height: 96 }, requiredFactory: 'warfactory', role: 'vehicle', canAttackAir: false, canAttackGround: true },
+  ravager: { label: 'Ravager Strain', hp: 450, speed: 68, range: 230, acquireRange: 320, vision: 400, damage: 52, cooldown: 1350, cost: 1180, supply: 4, buildMs: 6100, spriteSize: { width: 104, height: 104 }, requiredFactory: 'warfactory', role: 'vehicle', canAttackAir: false, canAttackGround: true },
+  wraith: { label: 'Wraith Flier', hp: 220, speed: 130, range: 200, acquireRange: 320, vision: 470, damage: 22, cooldown: 700, cost: 950, supply: 3, buildMs: 5200, spriteSize: { width: 90, height: 90 }, requiredFactory: 'airfield', role: 'air', canAttackAir: true, canAttackGround: true, isFlying: true },
+  devourer: { label: 'Devourer', hp: 390, speed: 102, range: 250, acquireRange: 350, vision: 470, damage: 46, cooldown: 1120, cost: 1380, supply: 4, buildMs: 7200, spriteSize: { width: 108, height: 108 }, requiredFactory: 'airfield', role: 'air', canAttackAir: true, canAttackGround: true, isFlying: true },
+  drone: { label: 'Extractor Drone', hp: 390, speed: 72, range: 0, acquireRange: 0, vision: 300, damage: 0, cooldown: 0, cost: 1050, supply: 1, buildMs: 4600, spriteSize: { width: 92, height: 92 }, requiredFactory: 'warfactory', role: 'worker', canAttackAir: false, canAttackGround: false },
 
   // Veyra Ascendancy — costly, shielded, precise
-  lancer: { label: 'Lancer', hp: 70, shield: 75, shieldRegen: 8, speed: 108, range: 180, acquireRange: 250, vision: 360, damage: 18, cooldown: 720, cost: 280, buildMs: 2100, spriteSize: { width: 58, height: 58 }, requiredFactory: 'barracks', role: 'infantry', canAttackAir: true, canAttackGround: true },
-  adept: { label: 'Resonant Adept', hp: 110, shield: 110, shieldRegen: 10, speed: 100, range: 230, acquireRange: 305, vision: 400, damage: 32, cooldown: 980, cost: 520, buildMs: 3500, spriteSize: { width: 66, height: 66 }, requiredFactory: 'barracks', role: 'infantry', canAttackAir: false, canAttackGround: true },
-  seer: { label: 'Oracle Seer', hp: 80, shield: 130, shieldRegen: 12, speed: 105, range: 250, acquireRange: 0, vision: 560, damage: 0, cooldown: 0, cost: 650, buildMs: 4300, spriteSize: { width: 64, height: 64 }, requiredFactory: 'barracks', role: 'support', canAttackAir: false, canAttackGround: false },
-  sentinel: { label: 'Sentinel Walker', hp: 250, shield: 180, shieldRegen: 10, speed: 78, range: 240, acquireRange: 330, vision: 420, damage: 44, cooldown: 1030, cost: 980, buildMs: 5000, spriteSize: { width: 96, height: 96 }, requiredFactory: 'warfactory', role: 'vehicle', canAttackAir: true, canAttackGround: true },
-  colossus: { label: 'Prism Titan', hp: 360, shield: 260, shieldRegen: 12, speed: 56, range: 350, acquireRange: 430, vision: 490, damage: 72, cooldown: 1800, cost: 1650, buildMs: 7800, spriteSize: { width: 118, height: 118 }, requiredFactory: 'warfactory', role: 'vehicle', canAttackAir: false, canAttackGround: true },
-  seraph: { label: 'Seraph Fighter', hp: 150, shield: 170, shieldRegen: 11, speed: 156, range: 250, acquireRange: 360, vision: 520, damage: 34, cooldown: 650, cost: 1250, buildMs: 6200, spriteSize: { width: 92, height: 92 }, requiredFactory: 'airfield', role: 'air', canAttackAir: true, canAttackGround: true, isFlying: true },
-  arbiter: { label: 'Concord Sphere', hp: 230, shield: 300, shieldRegen: 14, speed: 92, range: 285, acquireRange: 380, vision: 600, damage: 38, cooldown: 980, cost: 1850, buildMs: 8600, spriteSize: { width: 110, height: 110 }, requiredFactory: 'airfield', role: 'air', canAttackAir: true, canAttackGround: true, isFlying: true },
-  probe: { label: 'Forgebound Probe', hp: 150, shield: 150, shieldRegen: 12, speed: 82, range: 0, acquireRange: 0, vision: 340, damage: 0, cooldown: 0, cost: 1150, buildMs: 4700, spriteSize: { width: 84, height: 84 }, requiredFactory: 'warfactory', role: 'worker', canAttackAir: false, canAttackGround: false },
+  lancer: { label: 'Lancer', hp: 70, shield: 75, shieldRegen: 8, speed: 108, range: 180, acquireRange: 250, vision: 360, damage: 18, cooldown: 720, cost: 280, supply: 1, buildMs: 2100, spriteSize: { width: 58, height: 58 }, requiredFactory: 'barracks', role: 'infantry', canAttackAir: true, canAttackGround: true },
+  adept: { label: 'Resonant Adept', hp: 110, shield: 110, shieldRegen: 10, speed: 100, range: 230, acquireRange: 305, vision: 400, damage: 32, cooldown: 980, cost: 520, supply: 2, buildMs: 3500, spriteSize: { width: 66, height: 66 }, requiredFactory: 'barracks', role: 'infantry', canAttackAir: false, canAttackGround: true },
+  seer: { label: 'Oracle Seer', hp: 80, shield: 130, shieldRegen: 12, speed: 105, range: 250, acquireRange: 0, vision: 560, damage: 0, cooldown: 0, cost: 650, supply: 2, buildMs: 4300, spriteSize: { width: 64, height: 64 }, requiredFactory: 'barracks', role: 'support', canAttackAir: false, canAttackGround: false },
+  sentinel: { label: 'Sentinel Walker', hp: 250, shield: 180, shieldRegen: 10, speed: 78, range: 240, acquireRange: 330, vision: 420, damage: 44, cooldown: 1030, cost: 980, supply: 3, buildMs: 5000, spriteSize: { width: 96, height: 96 }, requiredFactory: 'warfactory', role: 'vehicle', canAttackAir: true, canAttackGround: true },
+  colossus: { label: 'Prism Titan', hp: 360, shield: 260, shieldRegen: 12, speed: 56, range: 350, acquireRange: 430, vision: 490, damage: 72, cooldown: 1800, cost: 1650, supply: 5, buildMs: 7800, spriteSize: { width: 118, height: 118 }, requiredFactory: 'warfactory', role: 'vehicle', canAttackAir: false, canAttackGround: true },
+  seraph: { label: 'Seraph Fighter', hp: 150, shield: 170, shieldRegen: 11, speed: 156, range: 250, acquireRange: 360, vision: 520, damage: 34, cooldown: 650, cost: 1250, supply: 4, buildMs: 6200, spriteSize: { width: 92, height: 92 }, requiredFactory: 'airfield', role: 'air', canAttackAir: true, canAttackGround: true, isFlying: true },
+  arbiter: { label: 'Concord Sphere', hp: 230, shield: 300, shieldRegen: 14, speed: 92, range: 285, acquireRange: 380, vision: 600, damage: 38, cooldown: 980, cost: 1850, supply: 5, buildMs: 8600, spriteSize: { width: 110, height: 110 }, requiredFactory: 'airfield', role: 'air', canAttackAir: true, canAttackGround: true, isFlying: true },
+  probe: { label: 'Forgebound Probe', hp: 150, shield: 150, shieldRegen: 12, speed: 82, range: 0, acquireRange: 0, vision: 340, damage: 0, cooldown: 0, cost: 1150, supply: 1, buildMs: 4700, spriteSize: { width: 84, height: 84 }, requiredFactory: 'warfactory', role: 'worker', canAttackAir: false, canAttackGround: false },
 }
 
+/**
+ * Maximum supply a player can ever reach, regardless of how many providers they
+ * build. Without a ceiling the late game degenerates into whoever can spam the
+ * most supply structures, and the pathfinding/collision cost of the resulting
+ * army sizes is not something the simulation is built for.
+ */
+export const MAX_SUPPLY = 200
+
 export const BUILDING_STATS: Record<BuildingKind, BuildingStats> = {
-  conyard: { label: 'Command Core', hp: 1500, cost: 0, power: 0, size: 110, vision: 430, spriteSize: { width: 160, height: 160 } },
-  power: { label: 'Power Structure', hp: 680, cost: 600, power: -100, size: 82, vision: 255, spriteSize: { width: 128, height: 128 } },
-  refinery: { label: 'Resource Processor', hp: 920, cost: 1400, power: 30, size: 105, vision: 310, spriteSize: { width: 148, height: 148 } },
-  barracks: { label: 'Infantry Structure', hp: 720, cost: 700, power: 20, size: 82, vision: 295, spriteSize: { width: 136, height: 136 } },
-  warfactory: { label: 'Heavy Production', hp: 1080, cost: 2000, power: 45, size: 115, vision: 335, spriteSize: { width: 164, height: 164 } },
-  airfield: { label: 'Air Production', hp: 950, cost: 1750, power: 40, size: 104, vision: 370, spriteSize: { width: 150, height: 150 } },
-  techlab: { label: 'Advanced Research', hp: 820, cost: 1550, power: 30, size: 92, vision: 390, spriteSize: { width: 140, height: 140 } },
-  turret: { label: 'Defense Turret', hp: 540, cost: 650, power: 15, size: 58, vision: 455, spriteSize: { width: 108, height: 108 }, weapon: { damage: 28, range: 260, cooldown: 850 } },
-  detector: { label: 'Detection Array', hp: 480, cost: 850, power: 20, size: 60, vision: 700, spriteSize: { width: 105, height: 105 } },
+  conyard: { label: 'Command Core', hp: 1500, cost: 0, supply: 12, size: 110, vision: 430, spriteSize: { width: 160, height: 160 } },
+  power: { label: 'Power Structure', hp: 680, cost: 600, supply: 10, size: 82, vision: 255, spriteSize: { width: 128, height: 128 } },
+  refinery: { label: 'Resource Processor', hp: 920, cost: 1400, supply: 0, size: 105, vision: 310, spriteSize: { width: 148, height: 148 } },
+  barracks: { label: 'Infantry Structure', hp: 720, cost: 700, supply: 0, size: 82, vision: 295, spriteSize: { width: 136, height: 136 } },
+  warfactory: { label: 'Heavy Production', hp: 1080, cost: 2000, supply: 0, size: 115, vision: 335, spriteSize: { width: 164, height: 164 } },
+  airfield: { label: 'Air Production', hp: 950, cost: 1750, supply: 0, size: 104, vision: 370, spriteSize: { width: 150, height: 150 } },
+  techlab: { label: 'Advanced Research', hp: 820, cost: 1550, supply: 0, size: 92, vision: 390, spriteSize: { width: 140, height: 140 } },
+  turret: { label: 'Defense Turret', hp: 540, cost: 650, supply: 0, size: 58, vision: 455, spriteSize: { width: 108, height: 108 }, weapon: { damage: 28, range: 260, cooldown: 850 } },
+  detector: { label: 'Detection Array', hp: 480, cost: 850, supply: 0, size: 60, vision: 700, spriteSize: { width: 105, height: 105 } },
 }
 
 export const UPGRADE_DEFS: Record<UpgradeKey, UpgradeDefinition> = {
@@ -228,12 +249,6 @@ export const UPGRADE_DEFS: Record<UpgradeKey, UpgradeDefinition> = {
   veyra_arbiter_convergence: { key: 'veyra_arbiter_convergence', faction: 'veyra', label: 'Arbiter Convergence', description: 'Unlocks Arbiter Spheres.', cost: 1800, researchMs: 19000, requiredBuilding: 'airfield', prerequisites: ['veyra_star_gate', 'veyra_shield_harmonics'], tier: 3 },
 }
 
-export const FACTION_UPGRADES: Record<Faction, UpgradeKey[]> = {
-  aegis: ['aegis_composite_plating', 'aegis_targeting_ai', 'aegis_reactor_optimization', 'aegis_precision_school', 'aegis_siege_doctrine', 'aegis_heavy_chassis', 'aegis_aerospace_command', 'aegis_interceptor_program', 'aegis_nanomedicine'],
-  noctis: ['noctis_carapace_grafting', 'noctis_synaptic_acceleration', 'noctis_metabolic_bloom', 'noctis_acid_evolution', 'noctis_brood_mind', 'noctis_alpha_mauler', 'noctis_ravager_strain', 'noctis_phase_brood', 'noctis_devourer_strain'],
-  veyra: ['veyra_shield_harmonics', 'veyra_resonance_matrix', 'veyra_crystal_efficiency', 'veyra_phase_doctrine', 'veyra_oracle_path', 'veyra_sentinel_awakening', 'veyra_colossus_protocol', 'veyra_star_gate', 'veyra_arbiter_convergence'],
-}
-
 export const UNIT_UNLOCK_UPGRADE: Partial<Record<UnitKind, UpgradeKey>> = {
   sniper: 'aegis_precision_school', artillery: 'aegis_siege_doctrine', walker: 'aegis_heavy_chassis', gunship: 'aegis_aerospace_command', interceptor: 'aegis_interceptor_program',
   broodcaster: 'noctis_brood_mind', brute: 'noctis_alpha_mauler', ravager: 'noctis_ravager_strain', wraith: 'noctis_phase_brood', devourer: 'noctis_devourer_strain',
@@ -245,7 +260,7 @@ export function isUnitUnlocked(kind: UnitKind, completed: ReadonlySet<UpgradeKey
   return !requirement || completed.has(requirement)
 }
 
-export const ALL_UNIT_KINDS = Object.keys(UNIT_STATS) as UnitKind[]
+const ALL_UNIT_KINDS = Object.keys(UNIT_STATS) as UnitKind[]
 export const ALL_BUILDING_KINDS: BuildingKind[] = ['conyard', 'power', 'refinery', 'barracks', 'warfactory', 'airfield', 'techlab', 'turret', 'detector']
 export const WORKER_KINDS = new Set<UnitKind>(['harvester', 'drone', 'probe'])
 
@@ -287,7 +302,7 @@ export const UI_ICONS: Record<UnitKind | BuildingKind, string> = {
   lancer: '/assets/ui/lancer_icon.png', adept: '/assets/ui/adept_icon.png', seer: '/assets/ui/seer_icon.png', sentinel: '/assets/ui/sentinel_icon.png', colossus: '/assets/ui/colossus_icon.png', seraph: '/assets/ui/seraph_icon.png', arbiter: '/assets/ui/arbiter_icon.png', probe: '/assets/ui/probe_icon.png',
 }
 
-export const PORTRAITS: Record<UnitKind, string> = Object.fromEntries(ALL_UNIT_KINDS.map((kind) => [kind, `/assets/portraits/${kind}.png`])) as Record<UnitKind, string>
+const PORTRAITS: Record<UnitKind, string> = Object.fromEntries(ALL_UNIT_KINDS.map((kind) => [kind, `/assets/portraits/${kind}.png`])) as Record<UnitKind, string>
 
 /**
  * Best available artwork for an entity in the HUD: a full portrait where one
@@ -309,7 +324,7 @@ export const TEAM_TINT = { player: 0xe9f8f6, enemy: 0xffe7e7 } as const
  * and infantry are single-layer — a turret only makes sense on a chassis the
  * camera can see the top of.
  */
-export const TURRET_UNIT_KINDS: ReadonlySet<UnitKind> = new Set<UnitKind>([
+const TURRET_UNIT_KINDS: ReadonlySet<UnitKind> = new Set<UnitKind>([
   'tank', 'artillery', 'walker', 'brute', 'ravager', 'sentinel', 'colossus',
 ])
 

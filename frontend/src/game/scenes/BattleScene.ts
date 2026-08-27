@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import type { AlertSeverity, BuildingKind, Difficulty, Faction, MinimapBlip, Mission, UnitKind, UpgradeKey } from '../../types'
 import { useGameStore } from '../../store/gameStore'
-import { BUILDING_STATS, DIFFICULTY_DATA, FACTION_DATA, UNIT_STATS, UPGRADE_DEFS, buildingAtlasFrame, buildingLabel, isUnitUnlocked } from '../config'
+import { BUILDING_STATS, DIFFICULTY_DATA, FACTION_DATA, MAX_SUPPLY, UNIT_STATS, UPGRADE_DEFS, buildingAtlasFrame, buildingLabel, isUnitUnlocked } from '../config'
 import { Building } from '../entities/Building'
 import type { Damageable } from '../entities/Damageable'
 import { ResourcePatch } from '../entities/ResourcePatch'
@@ -415,6 +415,11 @@ export class BattleScene extends Phaser.Scene {
 
     this.spawnBuilding('conyard', 'enemy', enemy.x, enemy.y)
     this.spawnBuilding('power', 'enemy', enemy.x + 160, enemy.y - 140)
+    // A second supply structure: the largest authored enemy army (10 units,
+    // scaled 1.5x on Brutal) would otherwise spawn over the cap set by a single
+    // provider. It is also a legitimate target — destroying both supply-blocks
+    // the AI until it rebuilds.
+    this.spawnBuilding('power', 'enemy', enemy.x + 235, enemy.y - 55)
     this.spawnBuilding('refinery', 'enemy', enemy.x + 20, enemy.y - 175)
     this.spawnBuilding('warfactory', 'enemy', enemy.x - 165, enemy.y + 145)
     this.spawnBuilding('barracks', 'enemy', enemy.x + 150, enemy.y + 145)
@@ -862,9 +867,10 @@ export class BattleScene extends Phaser.Scene {
       this.alert(`Need $${stats.cost.toLocaleString()} for ${stats.label}.`, 'warning')
       return
     }
-    const economy = this.calculatePower()
-    if (economy.used > economy.capacity) {
-      this.alert('Low power: unit production is offline.', 'critical')
+    const supply = this.calculateSupply()
+    if (supply.used + stats.supply > supply.capacity) {
+      const provider = buildingLabel('power', this.playerFaction)
+      this.alert(`Supply capped at ${supply.capacity}. Build a ${provider} to train ${stats.label}.`, 'warning')
       return
     }
     this.credits -= stats.cost
@@ -899,11 +905,8 @@ export class BattleScene extends Phaser.Scene {
       this.alert(`Need $${def.cost.toLocaleString()} to research ${def.label}.`, 'warning')
       return
     }
-    const power = this.calculatePower()
-    if (power.used > power.capacity) {
-      this.alert('Low power: research systems are offline.', 'critical')
-      return
-    }
+    // Deliberately not supply-gated: supply constrains army size, and research
+    // adds no units. Credits and the required structure are the only costs.
     this.credits -= def.cost
     this.research.enqueue(building, this.playerFaction, upgradeKey)
     this.sound.play('sfx-confirm', { volume: 0.16 })
@@ -928,7 +931,7 @@ export class BattleScene extends Phaser.Scene {
     this.applyUpgradeEffects(team)
     if (team === 'player') {
       useGameStore.getState().setCompletedUpgrades([...this.completedUpgrades])
-      useGameStore.getState().setStatus('playing', `${UPGRADE_DEFS[upgradeKey].label} research complete.`)
+      this.alert(`${UPGRADE_DEFS[upgradeKey].label} research complete.`)
     }
   }
 
@@ -937,8 +940,8 @@ export class BattleScene extends Phaser.Scene {
     if (!allowed.includes(kind)) return false
     const stats = UNIT_STATS[kind]
     const factories = this.buildings.filter((building) => building.alive && building.team === 'enemy' && building.kind === stats.requiredFactory)
-    const enemyPower = this.calculatePowerForTeam('enemy')
-    if (enemyPower.used > enemyPower.capacity) {
+    const enemySupply = this.calculateSupplyForTeam('enemy')
+    if (enemySupply.used + stats.supply > enemySupply.capacity) {
       this.tryEnemyBuild('power')
       return false
     }
@@ -1168,29 +1171,43 @@ export class BattleScene extends Phaser.Scene {
     unit.applyUpgradeModifiers({ speed, damage, cooldown, visionBonus, rangeBonus, damageReduction, shieldRegen })
   }
 
-  private calculatePowerForTeam(team: 'player' | 'enemy'): { used: number; capacity: number } {
+  /**
+   * Supply committed against the cap for a team.
+   *
+   * "Used" counts living units *plus* everything queued or in production, so a
+   * player cannot dodge the cap by filling every factory queue in the same
+   * instant that the last slot frees up. "Capacity" is the sum of supply from
+   * living structures, clamped to `MAX_SUPPLY`.
+   */
+  private calculateSupplyForTeam(team: 'player' | 'enemy'): { used: number; capacity: number } {
     let used = 0
-    let capacity = 0
-    for (const building of this.buildings.filter((item) => item.alive && item.team === team)) {
-      const power = BUILDING_STATS[building.kind].power
-      if (power < 0) capacity += Math.abs(power)
-      else used += power
+    for (const unit of this.units) {
+      if (unit.alive && unit.team === team) used += UNIT_STATS[unit.kind].supply
     }
-    return { used, capacity }
+    used += this.production?.queuedSupply(team) ?? 0
+
+    let capacity = 0
+    for (const building of this.buildings) {
+      if (building.alive && building.team === team) capacity += BUILDING_STATS[building.kind].supply
+    }
+    return { used, capacity: Math.min(MAX_SUPPLY, capacity) }
   }
 
-  private calculatePower(): { used: number; capacity: number } {
-    return this.calculatePowerForTeam('player')
+  private calculateSupply(): { used: number; capacity: number } {
+    return this.calculateSupplyForTeam('player')
   }
 
   private syncStore(forceSelection: boolean, now = this.time.now): void {
-    const power = this.calculatePower()
+    const supply = this.calculateSupply()
     const store = useGameStore.getState()
-    store.setEconomy(Math.round(this.credits), power.used, power.capacity, this.currentIncome(now))
+    store.setEconomy(Math.round(this.credits), supply.used, supply.capacity, this.currentIncome(now))
     store.setProductionQueues(this.production?.getPlayerViews() ?? [])
     store.setResearchQueues(this.research?.getPlayerViews() ?? [])
     store.setCompletedUpgrades([...this.completedUpgrades])
     store.setAttackMoveArmed(this.attackMoveArmed)
+    store.setOwnedBuildingKinds([
+      ...new Set(this.buildings.filter((item) => item.alive && item.team === 'player').map((item) => item.kind)),
+    ])
     this.syncControlGroupSizes()
     if (forceSelection || this.selectedUnits.length > 0 || this.selectedBuilding) this.syncSelection()
   }

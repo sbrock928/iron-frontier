@@ -33,6 +33,11 @@ const RESERVED = new Set<string>(Object.values(ORDER_HOTKEYS))
  * the card's contents actually change.
  *
  * Entries are returned in the order given, so grid positions stay stable.
+ *
+ * With 7 reserved orders there are 19 assignable letters. Beyond that an entry
+ * is returned without a binding rather than sharing one, since a duplicate
+ * letter would fire two commands from a single keypress. A command card holds
+ * 12 slots, so this ceiling is not reachable in practice.
  */
 export function assignHotkeys<T>(entries: T[], labelOf: (entry: T) => string): Map<T, string> {
   const used = new Set(RESERVED)
@@ -71,7 +76,11 @@ export function padToGrid(actions: CommandAction[], size: number): Array<Command
   return padded
 }
 
-/** Rows x columns of the command card. */
+/**
+ * Shape of the command card. These are the single source of truth: the grid's
+ * CSS template is generated from them at render time rather than repeated in
+ * the stylesheet, so the two can never disagree.
+ */
 export const COMMAND_GRID_COLUMNS = 3
 export const COMMAND_GRID_ROWS = 4
 export const COMMAND_GRID_SIZE = COMMAND_GRID_COLUMNS * COMMAND_GRID_ROWS

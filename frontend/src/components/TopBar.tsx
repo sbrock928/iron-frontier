@@ -59,7 +59,7 @@ export function TopBar() {
         </div>
         <div
           className={supplyBlocked ? 'danger' : ''}
-          title={supplyBlocked ? 'Supply capped — build more power structures.' : 'Supply used of total available'}
+          title={supplyBlocked ? `Supply capped at ${supplyCap} — build more ${FACTION_DATA[faction].buildingLabels.power}s.` : 'Supply committed of total available'}
         >
           <span>Supply</span>
           <strong>{supplyUsed} / {supplyCap}</strong>

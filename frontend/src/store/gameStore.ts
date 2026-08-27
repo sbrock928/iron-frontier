@@ -18,10 +18,10 @@ type GameState = {
   difficulty: Difficulty
   credits: number
   /**
-   * Supply consumed by living units, and the cap provided by structures. Named
-   * "supply" rather than "power" because it gates unit production the way
-   * StarCraft supply does; the `power` BuildingKind that provides it keeps its
-   * own name.
+   * Supply committed by living and in-production units, and the cap provided by
+   * the command yard plus dedicated supply structures. Training is refused when
+   * a unit's supply cost would exceed the cap, so this is the hard ceiling on
+   * army size.
    */
   supplyUsed: number
   supplyCap: number
@@ -37,6 +37,13 @@ type GameState = {
   completedUpgrades: UpgradeKey[]
   attackMoveArmed: boolean
   controlGroups: Record<number, number>
+  /**
+   * Structure kinds the player currently has at least one living instance of.
+   * The command card needs this to disable orders whose required structure is
+   * missing, rather than letting the player open a submenu where every entry
+   * fails.
+   */
+  ownedBuildingKinds: BuildingKind[]
   setMission: (mission: Mission) => void
   setMissionCatalog: (missions: Mission[]) => void
   setFaction: (faction: Faction) => void
@@ -46,13 +53,13 @@ type GameState = {
   setSelected: (selected: SelectedEntity[]) => void
   setStatus: (status: GameStatus, message?: string) => void
   pushAlert: (alert: Omit<GameAlert, 'id' | 'at'>) => void
-  clearAlerts: () => void
   setPlacementKind: (kind: BuildingKind | null) => void
   setProductionQueues: (queues: ProductionQueueView[]) => void
   setResearchQueues: (queues: ResearchQueueView[]) => void
   setCompletedUpgrades: (upgrades: UpgradeKey[]) => void
   setAttackMoveArmed: (armed: boolean) => void
   setControlGroups: (groups: Record<number, number>) => void
+  setOwnedBuildingKinds: (kinds: BuildingKind[]) => void
   resetBattleState: () => void
 }
 
@@ -74,6 +81,7 @@ const emptyBattleState = {
   completedUpgrades: [] as UpgradeKey[],
   attackMoveArmed: false,
   controlGroups: {} as Record<number, number>,
+  ownedBuildingKinds: [] as BuildingKind[],
 }
 
 export const useGameStore = create<GameState>((set) => ({
@@ -97,12 +105,12 @@ export const useGameStore = create<GameState>((set) => ({
     set((state) => ({
       alerts: [...state.alerts, { ...alert, id: nextAlertId++, at: Date.now() }].slice(-ALERT_LIMIT),
     })),
-  clearAlerts: () => set({ alerts: [] }),
   setPlacementKind: (placementKind) => set({ placementKind }),
   setProductionQueues: (productionQueues) => set({ productionQueues }),
   setResearchQueues: (researchQueues) => set({ researchQueues }),
   setCompletedUpgrades: (completedUpgrades) => set({ completedUpgrades }),
   setAttackMoveArmed: (attackMoveArmed) => set({ attackMoveArmed }),
   setControlGroups: (controlGroups) => set({ controlGroups }),
+  setOwnedBuildingKinds: (ownedBuildingKinds) => set({ ownedBuildingKinds }),
   resetBattleState: () => set({ ...emptyBattleState, status: 'loading' }),
 }))

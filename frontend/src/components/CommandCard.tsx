@@ -13,7 +13,7 @@ import {
   isUnitUnlocked,
 } from '../game/config'
 import { gameBus } from '../game/events/gameBus'
-import { COMMAND_GRID_SIZE, ORDER_HOTKEYS, assignHotkeys, padToGrid } from '../game/hotkeys'
+import { COMMAND_GRID_COLUMNS, COMMAND_GRID_ROWS, COMMAND_GRID_SIZE, ORDER_HOTKEYS, assignHotkeys, padToGrid } from '../game/hotkeys'
 import { useGameStore } from '../store/gameStore'
 import type { BuildingKind, CommandAction, UnitKind, UpgradeKey } from '../types'
 
@@ -69,6 +69,7 @@ export function CommandCard() {
   const placementKind = useGameStore((state) => state.placementKind)
   const attackMoveArmed = useGameStore((state) => state.attackMoveArmed)
   const productionQueues = useGameStore((state) => state.productionQueues)
+  const ownedBuildingKinds = useGameStore((state) => state.ownedBuildingKinds)
 
   const [page, setPage] = useState<CardPage>('root')
 
@@ -79,6 +80,7 @@ export function CommandCard() {
   useEffect(() => setPage('root'), [selectionSignature])
 
   const completed = useMemo(() => new Set<UpgradeKey>(completedUpgrades), [completedUpgrades])
+  const owned = useMemo(() => new Set<BuildingKind>(ownedBuildingKinds), [ownedBuildingKinds])
   const primary = selected[0] ?? null
   const selectedKinds = useMemo(() => new Set(selected.map((entity) => entity.kind)), [selected])
 
@@ -121,6 +123,14 @@ export function CommandCard() {
         ...available.map<CommandAction>((definition) => {
           const prerequisitesMet = definition.prerequisites.every((key) => completed.has(key))
           const affordable = credits >= definition.cost
+          const hasBuilding = owned.has(definition.requiredBuilding)
+          const reason = !hasBuilding
+            ? `Requires ${buildingLabel(definition.requiredBuilding, faction)}`
+            : !prerequisitesMet
+              ? 'Prerequisites not met'
+              : !affordable
+                ? 'Insufficient credits'
+                : null
           return {
             id: `research-${definition.key}`,
             label: definition.label,
@@ -129,8 +139,8 @@ export function CommandCard() {
             kind: 'research',
             key: definition.key,
             cost: definition.cost,
-            disabled: !prerequisitesMet || !affordable,
-            ...(prerequisitesMet ? (affordable ? {} : { reason: 'Insufficient credits' }) : { reason: 'Prerequisites not met' }),
+            disabled: reason !== null,
+            ...(reason ? { reason } : {}),
           }
         }),
         backAction,
@@ -231,12 +241,23 @@ export function CommandCard() {
       disabled: !hasWorker && primary?.kind !== 'conyard',
       ...(hasWorker || primary?.kind === 'conyard' ? {} : { reason: 'Select a worker or your construction yard' }),
     })
+    // Research is only reachable if the player owns at least one structure that
+    // can perform any of it; otherwise the submenu would be a dead end where
+    // every entry is disabled.
+    const researchBuildings = new Set(
+      Object.values(UPGRADE_DEFS)
+        .filter((definition) => definition.faction === faction && !completed.has(definition.key))
+        .map((definition) => definition.requiredBuilding),
+    )
+    const canResearch = [...researchBuildings].some((kind) => owned.has(kind))
     orders.push({
       id: 'open-research', label: 'Research', hotkey: ORDER_HOTKEYS.research, icon: UI_ICONS.techlab, kind: 'submenu', key: 'research',
+      disabled: !canResearch,
+      ...(canResearch ? {} : { reason: researchBuildings.size === 0 ? 'All research complete' : 'No research structure built' }),
     })
 
     return orders
-  }, [page, faction, credits, completed, primary, selected, selectedKinds, attackMoveArmed, productionQueues])
+  }, [page, faction, credits, completed, owned, primary, selected, selectedKinds, attackMoveArmed, productionQueues])
 
   const invoke = useMemo(() => (action: CommandAction) => {
     if (action.disabled) return
@@ -306,7 +327,15 @@ export function CommandCard() {
           Placing {buildingLabel(placementKind, faction)} — left-click the battlefield, Esc cancels.
         </p>
       )}
-      <div className="command-grid" role="group" aria-label="Command card">
+      <div
+        className="command-grid"
+        role="group"
+        aria-label="Command card"
+        style={{
+          gridTemplateColumns: `repeat(${COMMAND_GRID_COLUMNS}, 1fr)`,
+          gridTemplateRows: `repeat(${COMMAND_GRID_ROWS}, minmax(0, 1fr))`,
+        }}
+      >
         {slots.map((action, index) => (
           <CommandButton key={action?.id ?? `empty-${index}`} action={action} onInvoke={invoke} />
         ))}

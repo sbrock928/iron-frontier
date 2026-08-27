@@ -27,6 +27,7 @@ function combatStats(entity: SelectedEntity): { label: string; value: string }[]
       ...(dps ? [{ label: 'DPS', value: dps }] : []),
       ...(stats.damage > 0 ? [{ label: 'RNG', value: String(Math.round(stats.range)) }] : []),
       { label: 'SPD', value: String(Math.round(stats.speed)) },
+      { label: 'SUP', value: String(stats.supply) },
     ]
   }
 
@@ -35,7 +36,7 @@ function combatStats(entity: SelectedEntity): { label: string; value: string }[]
   return [
     ...(weapon ? [{ label: 'DPS', value: (weapon.damage / (weapon.cooldown / 1000)).toFixed(1) }] : []),
     ...(weapon ? [{ label: 'RNG', value: String(Math.round(weapon.range)) }] : []),
-    ...(stats.power !== 0 ? [{ label: 'PWR', value: stats.power > 0 ? `+${stats.power}` : String(stats.power) }] : []),
+    ...(stats.supply > 0 ? [{ label: 'SUP', value: `+${stats.supply}` }] : []),
   ]
 }
 

@@ -136,7 +136,7 @@ export type CommandAction = {
 export type ProductionQueueView = {
   buildingId: string
   buildingLabel: string
-  activeKind: UnitKind | null
+  activeKind: UnitKind
   activeLabel: string
   progress: number
   queuedKinds: UnitKind[]

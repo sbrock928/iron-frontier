@@ -14,7 +14,9 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T
 }
 
-export const getMission = (id = 'mission_01') => api<Mission>(`/missions/${id}`)
+export const getMissions = () => api<Mission[]>('/missions')
+
+export const listSaves = () => api<SaveGame[]>('/saves')
 
 export async function saveGame(slot: string, missionId: string, payload: SaveGamePayload): Promise<void> {
   await api(`/saves/${encodeURIComponent(slot)}`, {
@@ -22,9 +24,3 @@ export async function saveGame(slot: string, missionId: string, payload: SaveGam
     body: JSON.stringify({ mission_id: missionId, payload }),
   })
 }
-
-export const listSaves = () => api<SaveGame[]>('/saves')
-
-export const getSave = (slot: string) => api<SaveGame>(`/saves/${encodeURIComponent(slot)}`)
-
-export const getMissions = () => api<Mission[]>('/missions')

@@ -136,6 +136,7 @@ export function MainMenu({
                         {FACTION_DATA[save.payload.faction].shortName} vs {FACTION_DATA[save.payload.enemy_faction].shortName}
                         {' · '}{DIFFICULTY_DATA[save.payload.difficulty].label}
                         {' · '}${save.payload.credits.toLocaleString()}
+                        {' · '}{save.payload.supply_used}/{save.payload.supply_cap} sup
                       </span>
                       <small>{relativeTime(save.updated_at)}</small>
                     </button>
