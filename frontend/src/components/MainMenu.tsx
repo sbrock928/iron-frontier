@@ -28,6 +28,7 @@ export function MainMenu({
   onEnemyFactionChange,
   onDifficultyChange,
   onRestore,
+  onOpenCampaign,
   onStart,
 }: {
   missions: Mission[]
@@ -41,6 +42,7 @@ export function MainMenu({
   onEnemyFactionChange: (value: Faction) => void
   onDifficultyChange: (value: Difficulty) => void
   onRestore: (save: SaveGame) => void
+  onOpenCampaign: () => void
   onStart: () => void
 }) {
   const mission = missions.find((item) => item.id === missionId) ?? missions[0]
@@ -54,10 +56,31 @@ export function MainMenu({
         <header className="menu-header">
           <div className="menu-eyebrow">TACTICAL COMMAND NETWORK</div>
           <h1>IRON FRONTIER</h1>
-          <p>Choose your faction, opposition, battlefield and threat level before deployment.</p>
+          <p>Command a real-time skirmish or join a persistent, turn-based campaign with another player.</p>
         </header>
 
         {status === 'error' && <div className="menu-error"><strong>BACKEND CONNECTION FAILED</strong><span>{message}</span><small>Start FastAPI on 127.0.0.1:8000, then refresh this page.</small></div>}
+
+        <div className="menu-mode-grid">
+          <section className="menu-mode-card is-skirmish">
+            <span>REAL-TIME TACTICAL</span>
+            <strong>Frontier Skirmish</strong>
+            <small>Build a base, control units directly, and defeat the opposing force.</small>
+            <b>CONFIGURE BELOW</b>
+          </section>
+          <button
+            type="button"
+            className="menu-mode-card is-campaign"
+            data-tooltip="Open Sector Command\nCreate or join an asynchronous strategic campaign."
+            title="Open Sector Command campaign"
+            onClick={onOpenCampaign}
+          >
+            <span>ASYNCHRONOUS STRATEGIC</span>
+            <strong>Sector Command</strong>
+            <small>Claim territory, produce armies, research doctrine, and resolve turns when every commander is ready.</small>
+            <b>OPEN CAMPAIGNS →</b>
+          </button>
+        </div>
 
         <div className="menu-section-title"><span>01</span><strong>Choose your race</strong></div>
         <div className="faction-card-grid">

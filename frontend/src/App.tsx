@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getMissions, listSaves } from './api/client'
 import { CommandConsole } from './components/CommandConsole'
+import { CampaignHub } from './components/CampaignHub'
 import { GameCanvas } from './components/GameCanvas'
 import { MainMenu } from './components/MainMenu'
 import { MissionOverlay } from './components/MissionOverlay'
@@ -11,7 +12,7 @@ import { useGameStore } from './store/gameStore'
 import type { Difficulty, Faction, SaveGame } from './types'
 
 export default function App() {
-  const [screen, setScreen] = useState<'menu' | 'game'>('menu')
+  const [screen, setScreen] = useState<'menu' | 'game' | 'campaign'>('menu')
   const [missionId, setMissionId] = useState('mission_01')
   const [playerFaction, setPlayerFaction] = useState<Faction>('aegis')
   const [enemyFaction, setEnemyFaction] = useState<Faction>('noctis')
@@ -103,9 +104,14 @@ export default function App() {
         onEnemyFactionChange={setEnemyFaction}
         onDifficultyChange={setDifficulty}
         onRestore={restoreSave}
+        onOpenCampaign={() => setScreen('campaign')}
         onStart={deploy}
       />
     )
+  }
+
+  if (screen === 'campaign') {
+    return <CampaignHub onBack={() => setScreen('menu')} />
   }
 
   return (

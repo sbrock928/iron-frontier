@@ -3,6 +3,7 @@ app/__init__.py
 app/main.py
 app/seed.py
 app/api/__init__.py
+app/api/campaigns.py
 app/api/dependencies.py
 app/api/missions.py
 app/api/saves.py
@@ -13,12 +14,15 @@ app/dao/__init__.py
 app/dao/mission_dao.py
 app/dao/save_game_dao.py
 app/models/__init__.py
+app/models/campaign.py
 app/models/mission.py
 app/models/save_game.py
 app/schemas/__init__.py
+app/schemas/campaign.py
 app/schemas/mission.py
 app/schemas/save_game.py
 app/services/__init__.py
+app/services/campaign_service.py
 app/services/mission_service.py
 app/services/save_game_service.py
 iron_frontier_backend.egg-info/PKG-INFO
@@ -27,3 +31,4 @@ iron_frontier_backend.egg-info/dependency_links.txt
 iron_frontier_backend.egg-info/requires.txt
 iron_frontier_backend.egg-info/top_level.txt
 tests/test_api.py
+tests/test_campaign_api.py

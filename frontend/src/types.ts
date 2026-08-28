@@ -188,3 +188,124 @@ export type SaveGame = {
   payload: SaveGamePayload
   updated_at: string
 }
+
+export type CampaignOrderType = 'move' | 'produce' | 'research'
+
+export type CampaignSummary = {
+  id: string
+  join_code: string
+  name: string
+  status: string
+  turn_number: number
+  player_count: number
+  max_players: number
+  created_at: string
+}
+
+export type CampaignPlayer = {
+  id: string
+  display_name: string
+  faction: Faction
+  credits: number
+  ready: boolean
+}
+
+export type CampaignForce = {
+  player_id: string
+  unit_kind: UnitKind
+  quantity: number
+}
+
+export type CampaignSector = {
+  id: string
+  sector_key: string
+  label: string
+  map_x: number
+  map_y: number
+  resource_yield: number
+  base_level: number
+  owner_player_id: string | null
+  neighbor_ids: string[]
+  forces: CampaignForce[]
+}
+
+export type CampaignOrder = {
+  id: string
+  turn_number: number
+  order_type: CampaignOrderType
+  source_sector_id: string | null
+  target_sector_id: string | null
+  unit_kind: UnitKind | null
+  quantity: number | null
+  upgrade_key: UpgradeKey | null
+  cost: number
+  status: string
+  created_at: string
+}
+
+export type CampaignEvent = {
+  id: number
+  turn_number: number
+  sequence: number
+  event_type: string
+  message: string
+  payload: Record<string, unknown>
+  created_at: string
+}
+
+export type StrategicUnit = {
+  key: UnitKind
+  faction: Faction
+  label: string
+  cost: number
+  power: number
+}
+
+export type StrategicUpgrade = {
+  key: UpgradeKey
+  faction: Faction
+  label: string
+  description: string
+  cost: number
+}
+
+export type CampaignState = {
+  id: string
+  join_code: string
+  name: string
+  status: string
+  turn_number: number
+  max_players: number
+  version: number
+  viewer_player_id: string
+  viewer_token: string
+  players: CampaignPlayer[]
+  sectors: CampaignSector[]
+  completed_research: UpgradeKey[]
+  pending_orders: CampaignOrder[]
+  events: CampaignEvent[]
+  unit_catalog: StrategicUnit[]
+  research_catalog: StrategicUpgrade[]
+}
+
+export type CampaignCreateInput = {
+  name: string
+  commander_name: string
+  faction: Faction
+  max_players: number
+}
+
+export type CampaignJoinInput = {
+  join_code: string
+  commander_name: string
+  faction: Faction
+}
+
+export type CampaignOrderInput = {
+  order_type: CampaignOrderType
+  source_sector_id?: string
+  target_sector_id?: string
+  unit_kind?: UnitKind
+  quantity?: number
+  upgrade_key?: UpgradeKey
+}

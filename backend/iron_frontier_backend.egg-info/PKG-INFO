@@ -3,10 +3,13 @@ Name: iron-frontier-backend
 Version: 0.1.0
 Summary: FastAPI backend for Iron Frontier
 Requires-Python: >=3.11
+Requires-Dist: alembic<2.0,>=1.16
 Requires-Dist: fastapi<1.0,>=0.116
 Requires-Dist: uvicorn[standard]<1.0,>=0.35
 Requires-Dist: pydantic<3.0,>=2.11
 Requires-Dist: sqlalchemy<2.1,>=2.0.52
+Provides-Extra: mssql
+Requires-Dist: pyodbc<6.0,>=5.2; extra == "mssql"
 Provides-Extra: dev
 Requires-Dist: black>=25.1; extra == "dev"
 Requires-Dist: httpx>=0.28; extra == "dev"

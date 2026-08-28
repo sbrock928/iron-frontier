@@ -5,7 +5,7 @@ An original three-faction science-fiction real-time strategy game built as a pro
 ## Stack
 
 - **Frontend:** React 19 + TypeScript + Vite + Phaser 4 + Zustand
-- **Backend:** FastAPI + Pydantic v2 + SQLAlchemy 2 + SQLite
+- **Backend:** FastAPI + Pydantic v2 + SQLAlchemy 2 + Alembic + SQLite / Microsoft SQL Server
 - **Tooling:** Pytest, mypy, pylint, Black, isort, Vitest, ESLint, Prettier
 
 ## What is playable now
@@ -26,6 +26,67 @@ An original three-faction science-fiction real-time strategy game built as a pro
 - win / lose state
 - backend-loaded mission definition
 - backend save slots
+- asynchronous two-player Sector Command campaigns
+- persistent sector ownership, armies, research, orders, turn results, and campaign history
+
+## Sector Command campaign
+
+Choose **Sector Command** on the main menu to create or join a persistent campaign. The creator
+shares the six-character join code with a second player. Each commander chooses a different
+faction, queues movement, production, and research orders, then commits the turn. When both
+players are ready, the backend resolves orders deterministically, awards sector income, records
+the outcome in the event history, and opens the next planning turn.
+
+The browser polls for campaign updates every five seconds, so the mode does not require
+WebSockets. The database is authoritative: orders, forces, ownership, research, and replayable
+turn events survive browser and backend restarts. A saved campaign ID and private commander token
+in browser local storage resume the most recent command session on that computer. Public player
+IDs are never accepted as credentials; only a SHA-256 hash of the private token is stored in the
+database.
+
+### SQLite demo (default)
+
+No database configuration is needed. Starting FastAPI creates `backend/iron_frontier.db` and any
+missing tables automatically. This is the simplest way to evaluate the campaign on one laptop.
+
+To test the migration workflow against a separate, clean SQLite file on Windows PowerShell:
+
+```powershell
+cd backend
+$env:IRON_FRONTIER_DATABASE_URL = "sqlite:///./campaign-demo.db"
+$env:IRON_FRONTIER_AUTO_CREATE_SCHEMA = "false"
+alembic upgrade head
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+If the default database was already created by the application before Alembic was enabled, do
+not run the initial migration over those existing tables. After backing it up and confirming the
+schema is current, record the migration with `alembic stamp head`, or start with a fresh database
+file.
+
+### Switch to Microsoft SQL Server
+
+The application code does not change. Install the SQL Server driver extra, point the same
+environment variable at an empty SQL Server database, and apply the same Alembic migration:
+
+```powershell
+cd backend
+pip install -e ".[dev,mssql]"
+$env:IRON_FRONTIER_DATABASE_URL = "mssql+pyodbc://@SQLSERVER/IronFrontier?driver=ODBC+Driver+18+for+SQL+Server&trusted_connection=yes&Encrypt=yes&TrustServerCertificate=no"
+$env:IRON_FRONTIER_AUTO_CREATE_SCHEMA = "false"
+alembic upgrade head
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+This example uses Windows integrated authentication and Microsoft ODBC Driver 18. Replace
+`SQLSERVER`, the database name, and certificate options with values approved by your DBA. The
+migration identity needs permission to create tables and indexes; the runtime identity can be
+reduced to normal read/write permissions afterward. A managed ODBC DSN can also be used, for
+example `mssql+pyodbc://@IronFrontierDSN?trusted_connection=yes`.
+
+SQL Server replaces only the persistence layer. Players still reach the frontend and FastAPI
+host running on the laptop (or a later approved application server), so the laptop's inbound
+ports and the corporate network policy still need to permit that traffic.
 
 All artwork ships as generated PNGs loaded by Phaser (see **Art pipeline** below for how they're produced); there are no copyrighted C&C assets.
 
@@ -114,6 +175,8 @@ iron-frontier/
 │   │   ├── models/       # SQLAlchemy models
 │   │   ├── schemas/      # Pydantic request/response models
 │   │   └── services/     # business logic
+│   ├── alembic/           # portable schema migrations
+│   ├── alembic.ini
 │   └── tests/
 └── frontend/
     └── src/
@@ -158,7 +221,7 @@ npm run build
 - tech prerequisites
 - richer enemy base-building AI
 - map / mission editor
-- campaign progression
+- campaign-to-RTS battle-resolution bridge
 - audio and original sprite art
 
 

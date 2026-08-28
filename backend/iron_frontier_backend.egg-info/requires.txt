@@ -1,3 +1,4 @@
+alembic<2.0,>=1.16
 fastapi<1.0,>=0.116
 uvicorn[standard]<1.0,>=0.35
 pydantic<3.0,>=2.11
@@ -11,3 +12,6 @@ mypy>=1.17
 pylint>=3.3
 pytest>=8.4
 pytest-cov>=6.2
+
+[mssql]
+pyodbc<6.0,>=5.2
